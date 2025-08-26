@@ -59,9 +59,8 @@ def compose_maker(file_name, client_num):
         f.write(NETWORKS)
 
 def main(args):
-    print(f"Recibidos los arg: {args}")
     if len(args) != 3: 
-        print(f"Invalid args len. Expected 2 got {max(0, len(args)-1)}")
+        print(f"Invalid args lenght. Expected 2 got {max(0, len(args)-1)}")
     file_name, client_num = args[1], args[2]
     compose_maker(file_name, int(client_num))
 

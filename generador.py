@@ -9,7 +9,7 @@ SERVER = """  server:
     image: server:latest
     entrypoint: python3 /main.py
     volumes:
-      - ./server/config.ini: server/config.ini
+      - ./server/config.ini:config.ini
     environment:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG
@@ -20,6 +20,8 @@ CLIENT = """  client1:
     container_name: client1
     image: client:latest
     entrypoint: /client
+    volumes:
+      - ./client/config.yaml:config.yaml
     environment:
       - CLI_ID=1
       - CLI_LOG_LEVEL=DEBUG

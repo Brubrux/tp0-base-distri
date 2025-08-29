@@ -8,6 +8,8 @@ SERVER = """  server:
     container_name: server
     image: server:latest
     entrypoint: python3 /main.py
+    volumes:
+      - ./server/config.ini: server/config.ini
     environment:
       - PYTHONUNBUFFERED=1
       - LOGGING_LEVEL=DEBUG

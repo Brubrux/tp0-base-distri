@@ -12,23 +12,8 @@ SERVER = """  server:
       - ./server/config.ini:/config.ini
     environment:
       - PYTHONUNBUFFERED=1
-      - LOGGING_LEVEL=DEBUG
     networks:
       - testing_net
-"""
-CLIENT = """  client1:
-    container_name: client1
-    image: client:latest
-    entrypoint: /client
-    volumes:
-      - ./client/config.yaml:/config_volume.yaml
-    environment:
-      - CLI_ID=1
-      - CLI_LOG_LEVEL=DEBUG
-    networks:
-      - testing_net
-    depends_on:
-      - server
 """
 
 NETWORKS = """networks:
@@ -44,9 +29,10 @@ def client_maker(client_id):
     container_name: client{client_id}
     image: client:latest
     entrypoint: /client
+    volumes:
+      - ./client/config.yaml:/config.yaml
     environment:
       - CLI_ID={client_id}
-      - CLI_LOG_LEVEL=DEBUG
     networks:
       - testing_net
     depends_on:

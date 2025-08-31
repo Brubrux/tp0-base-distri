@@ -186,4 +186,5 @@ La corrección personal tendrá en cuenta la calidad del código entregado y cas
 Se agregó el archivo `generar-compose.sh` que llama a un generador hecho en python. En este es donde se encuentra la lógica de crear y escribir el archivo pasado por parámetro.
 
 ## Ej 2
-Se modificó el archivo `generador.py` creado en el ejercicio anterior para agregar al docker-compose un volumen en el servidor y otro en el cliente. De manera que los cambios efectuados en los archivos `config.ini` y `config.yaml` se persistan. Además fue necesario modificar las rutas en el cliente y el servidor para que lean desde el volumen creado y no desde la copia del archivo. 
+Se modificó el archivo `generador.py` creado en el ejercicio anterior para agregar al docker-compose un volumen en el servidor y otro en el cliente. De manera que los cambios efectuados en los archivos `config.ini` y `config.yaml` se persistan. Además fue necesario modificar las rutas en el cliente y el servidor para que lean desde el volumen creado y no desde la copia del archivo.
+Se agregaron archivos .dockerignore que hacen que se evite copiar los archivos y asegurar que funciona mediante el volumen.

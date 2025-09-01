@@ -55,7 +55,7 @@ def main():
     server = Server(port, listen_backlog)
     
     def handler(signum, frame):
-        server.shutting_down = True
+        server.shutdown()
 
     signal.signal(signal.SIGTERM, handler)
     server.run()

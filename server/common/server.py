@@ -27,6 +27,7 @@ class Server:
             if client_sock:
                 self.__handle_client_connection(client_sock)
         self._server_socket.close()
+        logging.info(f'action: shutdown_close_socket | result: success')
 
 
     def __handle_client_connection(self, client_sock):
@@ -69,3 +70,10 @@ class Server:
             if self.shutting_down:
                 return None
             return self.__accept_new_connection()
+
+    def shutdown(self):
+        """
+        Shutdown the server
+        """
+        self.shutting_down = True
+        logging.info(f'action: received_SIGTERM | result: in_progress')

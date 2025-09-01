@@ -191,3 +191,14 @@ Se agregaron archivos .dockerignore que hacen que se evite copiar los archivos y
 
 ## Ej 3
 Se agrego el archivo `validar-echo-server.py` que levanta un contenedor **busybox**, se conecta al servidor y manda un mensaje arbitrario. Luego chequea que la respuesta del servidor sea la misma que el mensaje enviado. Si no se puede conectar o el mensaje es diferente el enviado, entonces enviara un error. A diferencia del ejercicio 1, aca se realizo la totalidad dle ejercicio en el mismo archivo .sh
+
+## Ej 4
+### Cliente
+Para el cierre gracefull del cliente se agregó un channel y se utilizó la función Notify del paquete signal de go. Una vez establecida la conexión, en cada iteración del loop, se chequea que este canal no haya recibido una señal SIGTERM. En caso de recibir una señal, se corta el ciclo antes de establecer la proxima conexión.
+
+### Servidor
+En un principio se registra en `main` un **signal handler**. Que utiliza el método `shutdown()` agregado a la clase `Server` para indicarle que debe iniciar el proceso de apagado.
+Para cortar el ciclo while del servidor se reemplazó el valor fijo `True` por un nuevo atributo de la clase `Server`: `self.shutting_down`. Este atributo es un booleano que se inicializa en false y pasa a true mediante `shutdown()`.
+Puede ocurrir que se reciba la señal SIGTERM mientras se está aceptando una conexión con un cliente, como la función `.accept()` es bloqueante, esto implica que se demore mas de lo esperado para finalizar el programa. Para acatar este caso se agregó un timeout en el método `__accept_new_connection(self)` que, en caso de ocurrir, chequea que el servidor no se esté apagando antes de volver a intentar conectarse. Si el servidor esta con `self.shutting_down=True` entonces sale de la función retornando `None`.
+Además, puede ocurrir que se reciba la señal mientras se esta manejando un cliente con una conexión activa. En este caso se agregó tambien un chequeo en `__handle_client_connection(self, client_sock)` el cual, si el server se está apagando, cierra la conexión con el cliente y hace un **early return**.
+Finalmente, al salir del ciclo principal de `run(self)`, se cierra el socket del servidor y se finaliza el programa.

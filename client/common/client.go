@@ -59,6 +59,7 @@ func (c *Client) StartClientLoop(sigterm_channel chan os.Signal) {
 		// Create the connection the server in every loop iteration. Send an
 		select {
 		case <-sigterm_channel:
+			log.Infof("action: loop_finished | result: received_SIGTERM | client_id: %v", c.config.ID)
 			return
 		default:
 			exit := sendMessage(c, msgID)

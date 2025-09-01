@@ -2,11 +2,11 @@
 
 FLAGS="-i --rm"
 NETWORK=tp0_testing_net
-MSG="HolaServer"
+MSG=HolaServer
 
-RES=$(docker run $FLAGS --network=$NETWORK busybox sh -c "echo $MSG | nc server 12345")
+RES=$(docker run $FLAGS --network=$NETWORK busybox sh -c "echo $MSG | nc server 12345" 2>/dev/null)
 
-if [ "$RES" == "$MSG" ]; then
+if [ "$RES" = "$MSG" ]; then
   echo "action: test_echo_server | result: success"
 else
   echo "action: test_echo_server | result: fail"

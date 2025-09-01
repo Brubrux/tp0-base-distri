@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from configparser import ConfigParser
+import signal
 from common.server import Server
 import logging
 import os
@@ -48,8 +49,15 @@ def main():
     logging.debug(f"action: config | result: success | port: {port} | "
                   f"listen_backlog: {listen_backlog} | logging_level: {logging_level}")
 
+
+    
     # Initialize server and start server loop
     server = Server(port, listen_backlog)
+    
+    def handler(signum, frame):
+        server.shutting_down = True
+
+    signal.signal(signal.SIGTERM, handler)
     server.run()
 
 def initialize_log(logging_level):

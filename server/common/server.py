@@ -4,8 +4,10 @@ import logging
 
 class Server:
     def __init__(self, port, listen_backlog):
+        self.shutting_down = False
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server_socket.settimeout(1.0)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
 
@@ -20,9 +22,12 @@ class Server:
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        while True:
+        while not self.shutting_down:
             client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+            if client_sock:
+                self.__handle_client_connection(client_sock)
+        self._server_socket.close()
+
 
     def __handle_client_connection(self, client_sock):
         """
@@ -32,6 +37,10 @@ class Server:
         client socket will also be closed
         """
         try:
+            if self.shutting_down:
+                client_sock.close()
+                return
+            
             # TODO: Modify the receive to avoid short-reads
             msg = client_sock.recv(1024).rstrip().decode('utf-8')
             addr = client_sock.getpeername()
@@ -51,8 +60,12 @@ class Server:
         Then connection created is printed and returned
         """
 
-        # Connection arrived
-        logging.info('action: accept_connections | result: in_progress')
-        c, addr = self._server_socket.accept()
-        logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
-        return c
+        try:
+            logging.info('action: accept_connections | result: in_progress')
+            c, addr = self._server_socket.accept()
+            logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
+            return c
+        except socket.timeout:
+            if self.shutting_down:
+                return None
+            return self.__accept_new_connection()

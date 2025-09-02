@@ -61,15 +61,15 @@ class Server:
         Then connection created is printed and returned
         """
 
-        try:
-            logging.info('action: accept_connections | result: in_progress')
-            c, addr = self._server_socket.accept()
-            logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
-            return c
-        except socket.timeout:
-            if self.shutting_down:
-                return None
-            return self.__accept_new_connection()
+        while not self.shutting_down:
+            try:
+                logging.info('action: accept_connections | result: in_progress')
+                c, addr = self._server_socket.accept()
+                logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
+                return c
+            except socket.timeout:
+                continue
+        return None 
 
     def shutdown(self):
         """

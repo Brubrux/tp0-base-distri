@@ -95,6 +95,24 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
+type Bet struct {
+	FirstName string
+	LastName  string
+	ID        string
+	BirthDate string
+	Number    string
+}
+
+func GetEnvVars() Bet {
+	return Bet{
+		FirstName: os.Getenv("NOMBRE"),
+		LastName:  os.Getenv("APELLIDO"),
+		ID:        os.Getenv("DOCUMENTO"),
+		BirthDate: os.Getenv("NACIMIENTO"),
+		Number:    os.Getenv("NUMERO"),
+	}
+}
+
 func main() {
 	v, err := InitConfig()
 	if err != nil {
@@ -114,6 +132,15 @@ func main() {
 		LoopAmount:    v.GetInt("loop.amount"),
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
+
+	// loggear las variables de entorno
+	log.Infof("action: config | result: success | client_id: %s | server_address: %s | loop_amount: %v | loop_period: %v | log_level: %s",
+		clientConfig.ID,
+		clientConfig.ServerAddress,
+		clientConfig.LoopAmount,
+		clientConfig.LoopPeriod,
+		v.GetString("log.level"),
+	)
 
 	sigterm_channel := make(chan os.Signal, 1)
 	signal.Notify(sigterm_channel, syscall.SIGTERM)

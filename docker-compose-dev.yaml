@@ -11,6 +11,18 @@ services:
     networks:
       - testing_net
 
+  client1:
+    container_name: client1
+    image: client:latest
+    entrypoint: /client
+    volumes:
+      - ./client/config.yaml:/config.yaml
+    environment:
+      - CLI_ID=1
+    networks:
+      - testing_net
+    depends_on:
+      - server
 networks:
   testing_net:
     ipam:

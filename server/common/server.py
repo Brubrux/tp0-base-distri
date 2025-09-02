@@ -22,12 +22,15 @@ class Server:
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
-        while not self.shutting_down:
-            client_sock = self.__accept_new_connection()
-            if client_sock:
+        while True:
+            try:
+                client_sock = self.__accept_new_connection()
                 self.__handle_client_connection(client_sock)
-        self._server_socket.close()
-        logging.info(f'action: shutdown_close_socket | result: success')
+            except OSError as e:
+                logging.info(f'action: shutdown_close_socket | result: success')
+                break
+
+            
 
 
     def __handle_client_connection(self, client_sock):
@@ -60,20 +63,16 @@ class Server:
         Function blocks until a connection to a client is made.
         Then connection created is printed and returned
         """
-
-        while not self.shutting_down:
-            try:
-                logging.info('action: accept_connections | result: in_progress')
-                c, addr = self._server_socket.accept()
-                logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
-                return c
-            except socket.timeout:
-                continue
-        return None 
+        logging.info('action: accept_connections | result: in_progress')
+        c, addr = self._server_socket.accept()
+        logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
+        return c 
 
     def shutdown(self):
         """
         Shutdown the server
         """
         self.shutting_down = True
+        self._server_socket.close()
+        
         logging.info(f'action: received_SIGTERM | result: in_progress')

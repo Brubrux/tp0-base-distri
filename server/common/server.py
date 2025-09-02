@@ -4,10 +4,8 @@ import logging
 
 class Server:
     def __init__(self, port, listen_backlog):
-        self.shutting_down = False
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_socket.settimeout(1.0)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
 
@@ -41,10 +39,6 @@ class Server:
         client socket will also be closed
         """
         try:
-            if self.shutting_down:
-                client_sock.close()
-                return
-            
             # TODO: Modify the receive to avoid short-reads
             msg = client_sock.recv(1024).rstrip().decode('utf-8')
             addr = client_sock.getpeername()
@@ -72,7 +66,6 @@ class Server:
         """
         Shutdown the server
         """
-        self.shutting_down = True
         self._server_socket.close()
         
         logging.info(f'action: received_SIGTERM | result: in_progress')

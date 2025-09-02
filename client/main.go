@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/bet"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
 )
 
@@ -95,16 +96,8 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
-type Bet struct {
-	FirstName string
-	LastName  string
-	ID        string
-	BirthDate string
-	Number    string
-}
-
-func GetEnvVars() Bet {
-	return Bet{
+func GetEnvVars() bet.Bet {
+	return bet.Bet{
 		FirstName: os.Getenv("NOMBRE"),
 		LastName:  os.Getenv("APELLIDO"),
 		ID:        os.Getenv("DOCUMENTO"),
@@ -139,7 +132,6 @@ func main() {
 	signal.Notify(sigterm_channel, syscall.SIGTERM)
 
 	client := common.NewClient(clientConfig)
-	//client.StartClientLoop(sigterm_channel)
 	client.SendBetInfo(fmt.Sprintf("FirstName=%s,LastName=%s,ID=%s,BirthDate=%s,Number=%s",
 		betInfo.FirstName,
 		betInfo.LastName,

@@ -75,12 +75,9 @@ func sendMessage(c *Client, msgID int) bool {
 	c.createClientSocket()
 
 	// TODO: Modify the send to avoid short-write
-	fmt.Fprintf(
-		c.conn,
-		"[CLIENT %v] Message N°%v\n",
-		c.config.ID,
-		msgID,
-	)
+	msg_to_send := []byte(fmt.Sprintf("[CLIENT %v] Message N°%v\n", c.config.ID, msgID))
+	fullWrite(c, msg_to_send)
+
 	msg, err := bufio.NewReader(c.conn).ReadString('\n')
 	c.conn.Close()
 
@@ -100,4 +97,44 @@ func sendMessage(c *Client, msgID int) bool {
 	// Wait a time between sending one message and the next one
 	time.Sleep(c.config.LoopPeriod)
 	return false
+}
+
+// ------- Ej5 --------
+
+func (c *Client) SendBetInfo(betInfo string) error {
+	msg := []byte(fmt.Sprintf("[CLIENT %v] Bet Info: %v\n", c.config.ID, betInfo))
+
+	c.createClientSocket()
+	if err := fullWrite(c, msg); err != nil {
+		return err
+	}
+
+	msgRcv, err := bufio.NewReader(c.conn).ReadString('\n')
+	c.conn.Close()
+
+	if err != nil {
+		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return nil
+	}
+
+	log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
+		c.config.ID,
+		msgRcv,
+	)
+	return nil
+}
+
+// Sends a message to the server making sure to write the full message
+func fullWrite(c *Client, msg []byte) error {
+	for written := 0; written < len(msg); {
+		n, err := c.conn.Write(msg[written:])
+		if err != nil {
+			return err
+		}
+		written += n
+	}
+	return nil
 }

@@ -200,3 +200,25 @@ Para el cierre gracefull del cliente se agregó un channel y se utilizó la func
 En un principio se registra en `main` un **signal handler**. Que utiliza el método `shutdown()` agregado a la clase `Server` para indicarle que debe apagarse.
 Para cortar el ciclo while del servidor se envolvió la lógica de negocio con el cliente dentro de un try..except. En caso de que se reciba una SIGTERM, el método `shutdown()` va a cerrar el socket, lo que va a generar que el `.accept()` se despierte y lanze una excepción. Esta excepcion va a ser captada por el wrapper antes mencionado y este va a salir del ciclo con un break.
 
+## Ej 5
+
+### Serializacion de los datos
+El mensaje que se envia tiene el siguiente formato:
+```
+| OpCode | Payload |
+```
+Con el payload variando segun el largo de cada campo.
+
+En particular, el mensaje de registro de una apuesta se da de la siguiente manera:
+```
+| 0x00 |
+| 1B FirstName lenght  | data |
+| 1B LastName lenght   | data |
+| 1B ID lenght         | data |
+| 1B BirthDate lenght  | data |
+| 1B Number lenght     | data |
+```
+
+#### OpCodes
+- 0x00: Registro de apuesta
+- 0x01: Confirmacion de apuesta

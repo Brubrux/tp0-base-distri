@@ -15,7 +15,7 @@ func (c *Client) SendBetRegister(b protocol.BetRegister) {
 
 	// Serialize and send
 	msg := b.ToBytes()
-	if err := fullWrite(c, msg); err != nil {
+	if err := FullWrite(c, msg); err != nil {
 		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
@@ -54,7 +54,7 @@ func (c *Client) SendBetRegister(b protocol.BetRegister) {
 }
 
 // Sends a message to the server making sure to write the full message
-func fullWrite(c *Client, msg []byte) error {
+func FullWrite(c *Client, msg []byte) error {
 	for written := 0; written < len(msg); {
 		n, err := c.conn.Write(msg[written:])
 		if err != nil {

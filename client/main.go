@@ -110,10 +110,11 @@ func main() {
 	PrintConfig(v)
 
 	clientConfig := common.ClientConfig{
-		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
-		LoopAmount:    v.GetInt("loop.amount"),
-		LoopPeriod:    v.GetDuration("loop.period"),
+		ServerAddress:  v.GetString("server.address"),
+		ID:             v.GetString("id"),
+		LoopAmount:     v.GetInt("loop.amount"),
+		LoopPeriod:     v.GetDuration("loop.period"),
+		MaxBatchAmount: v.GetInt("maxAmount"),
 	}
 
 	agency_id, err := strconv.ParseUint(clientConfig.ID, 10, 8)
@@ -126,7 +127,7 @@ func main() {
 	sigterm_channel := make(chan os.Signal, 1)
 	signal.Notify(sigterm_channel, syscall.SIGTERM)
 
-	client := common.NewClient(clientConfig)
+	client := common.NewClient(clientConfig, sigterm_channel)
 
-	client.SendBetBatch(bet_file)
+	client.SendBetBatch(bet_file, uint8(agency_id))
 }

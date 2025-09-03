@@ -1,6 +1,7 @@
 package protocol
 
 type BetRegister struct {
+	Agency    uint8
 	FirstName string
 	LastName  string
 	ID        string

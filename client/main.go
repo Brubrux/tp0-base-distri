@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,8 +97,9 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
-func GetEnvVars() protocol.BetRegister {
+func GetEnvVars(client_id uint8) protocol.BetRegister {
 	return protocol.BetRegister{
+		Agency:    client_id,
 		FirstName: os.Getenv("NOMBRE"),
 		LastName:  os.Getenv("APELLIDO"),
 		ID:        os.Getenv("DOCUMENTO"),
@@ -126,7 +128,12 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	betInfo := GetEnvVars()
+	agency_id, err := strconv.ParseUint(clientConfig.ID, 10, 8)
+	if err != nil {
+		log.Criticalf("%s", err)
+	}
+
+	betInfo := GetEnvVars(uint8(agency_id))
 
 	sigterm_channel := make(chan os.Signal, 1)
 	signal.Notify(sigterm_channel, syscall.SIGTERM)

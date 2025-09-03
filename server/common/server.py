@@ -90,7 +90,7 @@ class Server:
             return p.BetConfirmation(False, "bad_request")
 
         b = u.Bet(
-            agency='1',
+            agency=br.agency_id,
             birthdate=br.birth_date,
             document=br.id,
             first_name=br.first_name,

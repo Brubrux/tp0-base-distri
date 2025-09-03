@@ -8,7 +8,8 @@ class OpCodes(enum.IntEnum):
 
 class BetRegister:
 
-    def __init__(self, first_name, last_name, id, birth_date, number):
+    def __init__(self, agency_id, first_name, last_name, id, birth_date, number):
+        self.agency_id = agency_id
         self.first_name = first_name
         self.last_name = last_name
         self.id = id
@@ -22,7 +23,10 @@ class BetRegister:
         op_code = msg[index]
         if op_code != OpCodes.REGISTER:
             raise ValueError(f"Invalid OpCode: {op_code} should be {OpCodes.REGISTER}")
+        index += 1
 
+        # AgencyID
+        agency_id = msg[index]
         index += 1
 
         # FirstName
@@ -55,8 +59,7 @@ class BetRegister:
         number = msg[index:index + number_length].decode('utf-8')
         index += number_length
 
-        return BetRegister(first_name, last_name, id, birth_date, number)
-    
+        return BetRegister(agency_id, first_name, last_name, id, birth_date, number)
 
 
 class BetConfirmation:

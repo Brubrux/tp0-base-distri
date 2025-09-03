@@ -18,6 +18,8 @@ func (b *BetRegister) ToBytes() []byte {
 
 	binary.Write(&buf, binary.BigEndian, REGISTER)
 
+	binary.Write(&buf, binary.BigEndian, b.Agency)
+
 	writeField := func(field string) {
 		fieldBytes := []byte(field)
 		binary.Write(&buf, binary.BigEndian, uint8(len(fieldBytes)))
@@ -62,6 +64,12 @@ func DeserializeRegister(data []byte) (BetRegister, error) {
 	if opCode != REGISTER {
 		return br, fmt.Errorf("invalid OpCode: %d", opCode)
 	}
+
+	var agency uint8
+	if err := binary.Read(buf, binary.BigEndian, &agency); err != nil {
+		return br, err
+	}
+	br.Agency = agency
 
 	readField := func() (string, error) {
 		var length uint8

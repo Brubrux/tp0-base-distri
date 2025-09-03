@@ -9,6 +9,7 @@ import (
 // Register
 func TestBetRegisterSerialization(t *testing.T) {
 	bet := BetRegister{
+		Agency:    1,
 		FirstName: "Santiago Lionel",
 		LastName:  "Lorca",
 		ID:        "30904465",

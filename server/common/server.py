@@ -1,7 +1,7 @@
 import socket
 import logging
-import time
 from common import protocol as p
+from common import utils as u
 
 
 class Server:
@@ -47,7 +47,7 @@ class Server:
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
 
-            confirmation = self.__handle_bet_register(msg)
+            confirmation = self.__handle_bet_register(msg, addr[0])
 
             # TODO: Modify the send to avoid short-writes
             logging.info(f'action: send_confirmation | result: in_progress | ip: {addr[0]}')
@@ -78,7 +78,7 @@ class Server:
         
         logging.info(f'action: received_SIGTERM | result: in_progress')
 
-    def __handle_bet_register(self, msg):
+    def __handle_bet_register(self, msg, addr):
         """
         Handle bet registration message
         """
@@ -88,5 +88,19 @@ class Server:
         except Exception as e:
             logging.error(f'action: decode_bet_register | result: fail | error: {e}')
             return p.BetConfirmation(False, "bad_request")
+
+        b = u.Bet(
+            agency='1',
+            birthdate=br.birth_date,
+            document=br.id,
+            first_name=br.first_name,
+            last_name=br.last_name,
+            number=br.number
+        )
+        try:
+            u.store_bets([b])
+        except Exception as e:
+            logging.error(f'action: store_bet | result: fail | error: {e}')
+            return p.BetConfirmation(False, "internal_error")
 
         return p.BetConfirmation(True, "")

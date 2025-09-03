@@ -53,6 +53,7 @@ class Server:
             logging.info(f'action: send_confirmation | result: in_progress | ip: {addr[0]}')
             client_sock.send(confirmation.ToBytes())
 
+
         except OSError as e:
             logging.error(f'action: receive_message | result: fail | error: {e}')
         finally:
@@ -89,6 +90,7 @@ class Server:
             logging.error(f'action: decode_bet_register | result: fail | error: {e}')
             return p.BetConfirmation(False, "bad_request")
 
+        logging.debug(f'action: process_bet_register | result: in_progress | bet: {br.agency_id, br.first_name, br.last_name, br.id, br.birth_date, br.number}')
         b = u.Bet(
             agency=br.agency_id,
             birthdate=br.birth_date,
@@ -100,7 +102,7 @@ class Server:
         try:
             u.store_bets([b])
         except Exception as e:
-            logging.error(f'action: store_bet | result: fail | error: {e}')
+            logging.error(f'action: apuesta_almacenada | result: fail | error: {e}')
             return p.BetConfirmation(False, "internal_error")
-
+        logging.info(f'action: apuesta_almacenada | result: success | dni: {br.id} | numero: {br.number}')
         return p.BetConfirmation(True, "")

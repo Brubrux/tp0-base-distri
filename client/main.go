@@ -135,6 +135,8 @@ func main() {
 
 	betInfo := GetEnvVars(uint8(agency_id))
 
+	log.Infof("action: bet_info | result: success | bet: %v", betInfo)
+
 	sigterm_channel := make(chan os.Signal, 1)
 	signal.Notify(sigterm_channel, syscall.SIGTERM)
 

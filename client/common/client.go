@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/bet"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 	"github.com/op/go-logging"
 )
 
@@ -102,7 +102,7 @@ func sendMessage(c *Client, msgID int) bool {
 
 // ------- Ej5 --------
 
-func (c *Client) SendBet(b bet.Bet) error {
+func (c *Client) SendBet(b protocol.BetRegister) error {
 	msg := []byte(fmt.Sprintf("[CLIENT %v] Bet: %v\n", c.config.ID, b))
 	return c.SendBetInfo(string(msg))
 }

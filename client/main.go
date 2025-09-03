@@ -13,8 +13,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/bet"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 )
 
 const CONFIG_FILE = "/config.yaml"
@@ -96,8 +96,8 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
-func GetEnvVars() bet.Bet {
-	return bet.Bet{
+func GetEnvVars() protocol.BetRegister {
+	return protocol.BetRegister{
 		FirstName: os.Getenv("NOMBRE"),
 		LastName:  os.Getenv("APELLIDO"),
 		ID:        os.Getenv("DOCUMENTO"),

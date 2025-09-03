@@ -209,7 +209,12 @@ El mensaje que se envia tiene el siguiente formato:
 ```
 Con el payload variando segun el largo de cada campo.
 
-En particular, el mensaje de registro de una apuesta se da de la siguiente manera:
+#### OpCodes
+- 0x00: Registro de apuesta
+- 0x01: Confirmacion de apuesta
+
+#### BetRegister
+Para cada campo necesario en el registro, se agrega un campo de 1 byte que indica la longitud del valor.
 ```
 | 0x00 |
 | 1B FirstName lenght  | data |
@@ -219,6 +224,14 @@ En particular, el mensaje de registro de una apuesta se da de la siguiente maner
 | 1B Number lenght     | data |
 ```
 
-#### OpCodes
-- 0x00: Registro de apuesta
-- 0x01: Confirmacion de apuesta
+#### BetConfirmation
+El byte del OpCode seguido de un byte que indica el exito (1) o fracaso (0) de la operación.
+Se agrega además soporte para un mensaje en caso de ser necesario. 
+```
+| 0x01 | 1B Success(bool) |
+| 1B MsgLen | Msg data |
+```
+Un mensaje de confirmación sin contenido tendrá el siguiente formato:
+| OpCode | Success | MsgLen |
+|   -    |   -     |   -    |
+|  0x01  |  0x01   | 0x00   |

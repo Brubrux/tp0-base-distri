@@ -1,10 +1,7 @@
 package common
 
 import (
-	"bufio"
-	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
@@ -52,54 +49,6 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop(sigterm_channel chan os.Signal) {
-	// There is an autoincremental msgID to identify every message sent
-	// Messages if the message amount threshold has not been surpassed
-	for msgID := 1; msgID <= c.config.LoopAmount; msgID++ {
-		// Create the connection the server in every loop iteration. Send an
-		select {
-		case <-sigterm_channel:
-			log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-			return
-		default:
-			exit := sendMessage(c, msgID)
-			if exit {
-				return
-			}
-		}
-	}
-	log.Infof("action: loop_finished | result: success | client_id: %v", c.config.ID)
-}
-
-func sendMessage(c *Client, msgID int) bool {
-	c.createClientSocket()
-
-	// TODO: Modify the send to avoid short-write
-	msg_to_send := []byte(fmt.Sprintf("[CLIENT %v] Message N°%v\n", c.config.ID, msgID))
-	fullWrite(c, msg_to_send)
-
-	msg, err := bufio.NewReader(c.conn).ReadString('\n')
-	c.conn.Close()
-
-	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return true
-	}
-
-	log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
-		c.config.ID,
-		msg,
-	)
-
-	// Wait a time between sending one message and the next one
-	time.Sleep(c.config.LoopPeriod)
-	return false
-}
-
 // ------- Ej5 --------
 
 // Sends a bet registration message to the server and awaits confirmation
@@ -118,8 +67,7 @@ func (c *Client) SendBetRegister(b protocol.BetRegister) {
 	}
 
 	// Await response
-	buffer := make([]byte, 1024)
-	n, err := c.conn.Read(buffer)
+	responseData, err := readWithPayloadLength(c.conn)
 	c.conn.Close()
 
 	if err != nil {
@@ -130,8 +78,8 @@ func (c *Client) SendBetRegister(b protocol.BetRegister) {
 		return
 	}
 
-	// Check confirmation (use only the bytes actually read)
-	confirmation, err := protocol.DeserializeConfirmation(buffer[:n])
+	// Check confirmation
+	confirmation, err := protocol.DeserializeConfirmation(responseData)
 	if err != nil {
 		log.Errorf("action: deserialize_confirmation | result: fail | client_id: %v | error: %v",
 			c.config.ID,
@@ -158,4 +106,58 @@ func fullWrite(c *Client, msg []byte) error {
 		written += n
 	}
 	return nil
+}
+
+// Reads exactly size bytes from the connection, handling short-reads
+func fullRead(conn net.Conn, size int) ([]byte, error) {
+	buffer := make([]byte, size)
+	totalRead := 0
+
+	for totalRead < size {
+		n, err := conn.Read(buffer[totalRead:])
+		if err != nil {
+			return nil, err
+		}
+		totalRead += n
+	}
+	return buffer, nil
+}
+
+// Reads a complete message using the payload length field
+func readWithPayloadLength(conn net.Conn) ([]byte, error) {
+
+	// 1 byte
+	opCodeData, err := fullRead(conn, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4 bytes, big-endian
+	payloadLengthData, err := fullRead(conn, 4)
+	if err != nil {
+		return nil, err
+	}
+	payloadLength := parseUint32BigEndian(payloadLengthData)
+
+	payloadData, err := fullRead(conn, int(payloadLength))
+	if err != nil {
+		return nil, err
+	}
+
+	fullMessage := make([]byte, 0, 1+4+len(payloadData))
+	fullMessage = append(fullMessage, opCodeData...)
+	fullMessage = append(fullMessage, payloadLengthData...)
+	fullMessage = append(fullMessage, payloadData...)
+
+	return fullMessage, nil
+}
+
+func parseUint32BigEndian(data []byte) uint32 {
+	if len(data) < 4 {
+		return 0
+	}
+	return uint32(data[0])<<24 |
+		uint32(data[1])<<16 |
+		uint32(data[2])<<8 |
+		uint32(data[3])
 }

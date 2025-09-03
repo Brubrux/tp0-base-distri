@@ -235,3 +235,12 @@ Un mensaje de confirmación sin contenido tendrá el siguiente formato:
 | OpCode | Success | MsgLen |
 |   -    |   -     |   -    |
 |  0x01  |  0x01   | 0x00   |
+
+### Logica de negocio
+La comunicacion en este caso es bastante simple.
+Al iniciar la transaccion, el cliente enviara un mensaje **BetRegister** creado a partir de las variables de entorno y su ID.
+Luego de enviar este mensaje, se queda a la espera de una respuesta del servidor. Esta respuesta viene en forma de un mensaje **BetConfirmation**. 
+La logica de serializacion y deserializacion de cada entidad se encuentra en el package `protocol` del cliente y en el modulo `protocol.py` del servidor.
+
+Este protocolo fue pensado para poder ser escalable en los proximos ejercicios. Ya que cuenta con un amplio rango para definir operaciones.
+

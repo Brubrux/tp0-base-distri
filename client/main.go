@@ -132,11 +132,5 @@ func main() {
 	signal.Notify(sigterm_channel, syscall.SIGTERM)
 
 	client := common.NewClient(clientConfig)
-	client.SendBetInfo(fmt.Sprintf("FirstName=%s,LastName=%s,ID=%s,BirthDate=%s,Number=%s",
-		betInfo.FirstName,
-		betInfo.LastName,
-		betInfo.ID,
-		betInfo.BirthDate,
-		betInfo.Number,
-	))
+	client.SendBetRegister(betInfo)
 }

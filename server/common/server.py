@@ -30,9 +30,6 @@ class Server:
                 logging.info(f'action: shutdown_close_socket | result: success')
                 break
 
-            
-
-
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -41,21 +38,21 @@ class Server:
         client socket will also be closed
         """
         try:
-            # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024)  # Remove .rstrip() for binary data
+            msg = _recv_message_with_payload_length(client_sock)
 
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
 
             confirmation = self.__handle_bet_register(msg, addr[0])
 
-            # TODO: Modify the send to avoid short-writes
             logging.info(f'action: send_confirmation | result: in_progress | ip: {addr[0]}')
-            client_sock.send(confirmation.ToBytes())
-
+            
+            _full_send(client_sock, confirmation.ToBytes())
 
         except OSError as e:
             logging.error(f'action: receive_message | result: fail | error: {e}')
+        except ConnectionError as e:
+            logging.error(f'action: connection_error | result: fail | error: {e}')
         finally:
             client_sock.close()
 
@@ -106,3 +103,53 @@ class Server:
             return p.BetConfirmation(False, "internal_error")
         logging.info(f'action: apuesta_almacenada | result: success | dni: {br.id} | numero: {br.number}')
         return p.BetConfirmation(True, "")
+    
+
+def parse_int4_big_endian(data):
+    if len(data) != 4:
+        raise ValueError("Data must be exactly 4 bytes long")
+    return (data[0] << 24) + (data[1] << 16) + (data[2] << 8) + data[3]
+
+
+# send and rcv wrappers for handling short-reads/writes
+
+def _full_recv(sock, size):
+    """
+    Receive exactly 'size' bytes, handling short-reads
+    """
+    data = bytearray()
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise ConnectionError
+        data.extend(chunk)
+    return bytes(data)
+
+def _full_send(sock, data):
+    """
+    Send all data, handling short-writes
+    """
+    total_sent = 0
+    while total_sent < len(data):
+        sent = sock.send(data[total_sent:])
+        if sent == 0:
+            raise ConnectionError
+        total_sent += sent
+
+def _recv_message_with_payload_length(sock):
+    """
+    Receive complete message using payload length field:
+    1. Read OpCode (1 byte)
+    2. Read Payload Length (4 bytes) 
+    3. Read exact payload bytes
+    """
+
+    opcode_data = _full_recv(sock, 1)
+    
+    # Payload Length
+    payload_length_data = _full_recv(sock, 4) 
+    payload_length = parse_int4_big_endian(payload_length_data)
+    
+    # Read the exact payload
+    payload_data = _full_recv(sock, payload_length)
+    return opcode_data + payload_length_data + payload_data

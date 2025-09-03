@@ -9,8 +9,15 @@ import (
 func (b *BetRegister) ToBytes() []byte {
 	var buf bytes.Buffer
 
+	payloadSize := b.getPayloadSize()
+
+	// Write OpCode (1 byte)
 	binary.Write(&buf, binary.BigEndian, REGISTER)
 
+	// Write Payload Length (4 bytes)
+	binary.Write(&buf, binary.BigEndian, payloadSize)
+
+	// Write Agency (1 byte)
 	binary.Write(&buf, binary.BigEndian, b.Agency)
 
 	writeField := func(field string) {
@@ -38,6 +45,12 @@ func DeserializeRegister(data []byte) (BetRegister, error) {
 	}
 	if opCode != REGISTER {
 		return br, fmt.Errorf("invalid OpCode: %d", opCode)
+	}
+
+	// Skip payload length
+	var payloadLength uint32
+	if err := binary.Read(buf, binary.BigEndian, &payloadLength); err != nil {
+		return br, err
 	}
 
 	var agency uint8
@@ -81,4 +94,19 @@ func DeserializeRegister(data []byte) (BetRegister, error) {
 	}
 
 	return br, nil
+}
+
+func (b *BetRegister) getPayloadSize() uint32 {
+	payloadSize := uint32(0)
+
+	// Agency: 1 byte
+	payloadSize += 1
+
+	// 1 byte (length) + string bytes
+	payloadSize += 1 + uint32(len(b.FirstName))
+	payloadSize += 1 + uint32(len(b.LastName))
+	payloadSize += 1 + uint32(len(b.ID))
+	payloadSize += 1 + uint32(len(b.BirthDate))
+	payloadSize += 1 + uint32(len(b.Number))
+	return payloadSize
 }

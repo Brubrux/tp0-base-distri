@@ -205,9 +205,14 @@ Para cortar el ciclo while del servidor se envolvió la lógica de negocio con e
 ### Serializacion de los datos
 El mensaje que se envia tiene el siguiente formato:
 ```
-| OpCode | Payload |
+| OpCode | Payload Lenght | Payload |
 ```
-Con el payload variando segun el largo de cada campo.
+Donde:
+- OpCode: 1B
+- Payload Length: 4B
+- Payload: Variable
+
+Dentro del payload se encuentra la información específica de cada operación. Y se anuncia su largo para facilitar la deserialización y evitar errores del tipo "short-read" o "short-write".
 
 #### OpCodes
 - 0x00: Registro de apuesta
@@ -216,25 +221,28 @@ Con el payload variando segun el largo de cada campo.
 #### BetRegister
 Para cada campo necesario en el registro, se agrega un campo de 1 byte que indica la longitud del valor.
 ```
-| 0x00 |    1B Agency Id      |
-| 1B FirstName lenght  | data |
-| 1B LastName lenght   | data |
-| 1B ID lenght         | data |
-| 1B BirthDate lenght  | data |
-| 1B Number lenght     | data |
+| 0x00 | Payload Lenght 4B  |
+| 1B Agency Id              |
+| 1B FirstName lenght| data |
+| 1B LastName lenght | data |
+| 1B ID lenght       | data |
+| 1B BirthDate lenght| data |
+| 1B Number lenght   | data |
 ```
 
 #### BetConfirmation
 El byte del OpCode seguido de un byte que indica el exito (1) o fracaso (0) de la operación.
 Se agrega además soporte para un mensaje en caso de ser necesario. 
 ```
-| 0x01 | 1B Success(bool) |
-| 1B MsgLen |  Msg data   |
+| 0x01 | Payload Lenght 4B |
+|     1B Success(bool)     |
+| 1B MsgLen |   Msg data   |
 ```
+
 Un mensaje de confirmación sin contenido tendrá el siguiente formato:
-| OpCode | Success | MsgLen |
-|   -    |   -     |   -    |
-|  0x01  |  0x01   | 0x00   |
+| OpCode | Payload Lenght | Success | MsgLen |
+|   -    |       -        |   -     |   -    |
+|  0x01  |      4B        |  0x01   |  0x00  |
 
 ### Logica de negocio
 La comunicacion en este caso es bastante simple.

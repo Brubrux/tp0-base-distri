@@ -25,6 +25,9 @@ class BetRegister:
             raise ValueError(f"Invalid OpCode: {op_code} should be {OpCodes.REGISTER}")
         index += 1
 
+        # Skip payload length
+        index += 4
+
         # AgencyID
         agency_id = msg[index]
         index += 1
@@ -68,9 +71,15 @@ class BetConfirmation:
         self.message = message
 
     def ToBytes(self):
+        message_bytes = self.message.encode('utf-8')
+        payload_size = 1 + 1 + len(message_bytes)  # success(1) + messageLength(1) + message
+        
         msg = bytearray()
         msg.append(OpCodes.CONFIRM)
+        
+        msg.extend(payload_size.to_bytes(4, byteorder='big'))
+        
         msg.append(self.success)
-        msg.append(len(self.message))
-        msg.extend(self.message.encode('utf-8'))
+        msg.append(len(message_bytes))
+        msg.extend(message_bytes)
         return bytes(msg)

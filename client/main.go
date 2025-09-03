@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 )
 
 const CONFIG_FILE = "/config.yaml"
@@ -97,17 +96,6 @@ func PrintConfig(v *viper.Viper) {
 	)
 }
 
-func GetEnvVars(client_id uint8) protocol.BetRegister {
-	return protocol.BetRegister{
-		Agency:    client_id,
-		FirstName: os.Getenv("NOMBRE"),
-		LastName:  os.Getenv("APELLIDO"),
-		ID:        os.Getenv("DOCUMENTO"),
-		BirthDate: os.Getenv("NACIMIENTO"),
-		Number:    os.Getenv("NUMERO"),
-	}
-}
-
 func main() {
 	v, err := InitConfig()
 	if err != nil {
@@ -133,13 +121,12 @@ func main() {
 		log.Criticalf("%s", err)
 	}
 
-	betInfo := GetEnvVars(uint8(agency_id))
-
-	log.Infof("action: bet_info | result: success | bet: %v", betInfo)
+	bet_file := fmt.Sprintf("/agency-%d.csv", agency_id)
 
 	sigterm_channel := make(chan os.Signal, 1)
 	signal.Notify(sigterm_channel, syscall.SIGTERM)
 
 	client := common.NewClient(clientConfig)
-	client.SendBetRegister(betInfo)
+
+	client.SendBetBatch(bet_file)
 }

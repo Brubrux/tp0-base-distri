@@ -1,5 +1,7 @@
 import socket
 import logging
+import time
+from common import protocol as p
 
 
 class Server:
@@ -40,13 +42,19 @@ class Server:
         """
         try:
             # TODO: Modify the receive to avoid short-reads
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
+            msg = client_sock.recv(1024)  # Remove .rstrip() for binary data
+
             addr = client_sock.getpeername()
-            logging.info(f'action: receive_message | result: success | ip: {addr[0]} | msg: {msg}')
+            logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
+
+            confirmation = self.__handle_bet_register(msg)
+
             # TODO: Modify the send to avoid short-writes
-            client_sock.send("{}\n".format(msg).encode('utf-8'))
+            logging.info(f'action: send_confirmation | result: in_progress | ip: {addr[0]}')
+            client_sock.send(confirmation.ToBytes())
+
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error(f'action: receive_message | result: fail | error: {e}')
         finally:
             client_sock.close()
 
@@ -69,3 +77,16 @@ class Server:
         self._server_socket.close()
         
         logging.info(f'action: received_SIGTERM | result: in_progress')
+
+    def __handle_bet_register(self, msg):
+        """
+        Handle bet registration message
+        """
+        try:
+            br = p.BetRegister.DeserializeBetRegister(msg)
+            logging.info(f'action: decode_bet_register | result: success')
+        except Exception as e:
+            logging.error(f'action: decode_bet_register | result: fail | error: {e}')
+            return p.BetConfirmation(False, "bad_request")
+
+        return p.BetConfirmation(True, "")

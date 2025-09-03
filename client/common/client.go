@@ -118,7 +118,8 @@ func (c *Client) SendBetRegister(b protocol.BetRegister) {
 	}
 
 	// Await response
-	response, err := bufio.NewReader(c.conn).ReadString('\n')
+	buffer := make([]byte, 1024)
+	n, err := c.conn.Read(buffer)
 	c.conn.Close()
 
 	if err != nil {
@@ -129,10 +130,10 @@ func (c *Client) SendBetRegister(b protocol.BetRegister) {
 		return
 	}
 
-	// Check confirmation
-	confirmation, err := protocol.DeserializeConfirmation([]byte(response))
+	// Check confirmation (use only the bytes actually read)
+	confirmation, err := protocol.DeserializeConfirmation(buffer[:n])
 	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
+		log.Errorf("action: deserialize_confirmation | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
 		)

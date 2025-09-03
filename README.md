@@ -252,3 +252,25 @@ La logica de serializacion y deserializacion de cada entidad se encuentra en el 
 
 Este protocolo fue pensado para poder ser escalable en los proximos ejercicios. Ya que cuenta con un amplio rango para definir operaciones.
 
+## Ej 6
+
+### Cliente
+Para la parte del cliente se agrega un nuevo OpCode (0x03) que indica que el mensaje contiene multiples apuestas. 
+Se agrega ademas el mensaje de tipo **BatchBetRegister** que, ademas de los headers, contendra la informacion de la agencia, la cantidad de apuestas del batch y finalmente el largo de cada apuesta junto a su contenido.
+
+```
+| 0x02 |  Payload Lenght 4B   |
+| 1B Agency Id | Bet count 4B |
+|  1B Bet #1 lenght  |  data  |
+|        ...         |  ...   |
+|  1B Bet #N lenght  |  data  |
+```
+
+### Servidor
+Para la confirmacion del chunk de apuestas se reutilizara el mensaje **BetConfirmation**, aprovechando el formato de este mensaje que incluye,ademas de indicar el exito o falla de la operacion, la posibilidad de agregar un mensaje con mayores detalles.
+
+
+#### OpCodes
+- 0x00: Registro de apuesta
+- 0x01: Confirmacion de apuesta
+- 0x02: Registro de multiples apuestas (batch)

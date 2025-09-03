@@ -3,3 +3,6 @@
 
 # Executables
 bin/
+
+# archivos en .data
+.data/agency-*

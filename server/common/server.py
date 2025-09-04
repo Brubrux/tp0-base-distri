@@ -15,9 +15,8 @@ class Server:
         self._active_connections = []
         self._connections_lock = threading.Lock()
         
-        self.agency_status = generate_lottery_diccionary(client_number)
-        self.lottery_conducted = False
-        self._status_lock = threading.Lock()  # Lock for agency_status and lottery_conducted
+        self._lottery_barrier = threading.Barrier(client_number)
+        self.client_number = client_number
 
         self._file_lock = threading.Lock()    # Lock for utils functions
 
@@ -139,6 +138,13 @@ class Server:
         
         self._shutdown_event.set()
         
+        # handle barrier
+        try:
+            self._lottery_barrier.abort()
+            logging.info(f'action: barrier_abort | result: success')
+        except Exception as e:
+            logging.warning(f'action: barrier_abort | result: fail | error: {e}')
+        
         # Close listening socket
         try:
             self._server_socket.close()
@@ -150,7 +156,7 @@ class Server:
         with self._connections_lock:
             connections_count = len(self._active_connections)
             if connections_count > 0:
-                logging.info(f'action: closing_active_connections | count: {connections_count}')
+                logging.debug(f'action: closing_active_connections | result: in_progress | count: {connections_count}')
                 for client_sock in self._active_connections[:]:
                     try:
                         client_sock.close()
@@ -165,7 +171,9 @@ class Server:
     def __handle_bet_batch(self, msg):
         try:
             bet_batch = p.BetBatchRegister.DeserializeBetBatch(msg)
+            logging.info(f'action: decode_bet_batch | result: success | bets_count: {len(bet_batch.bets)}')
         except ValueError as e:
+            logging.error(f'action: decode_bet_batch | result: fail | error: {e}')
             return p.BetConfirmation(False, "bad_request")
 
         try:
@@ -182,9 +190,13 @@ class Server:
         get_winners_request = p.GetWinners.DeserializeGetWinners(msg)
         logging.info(f'action: decode_get_winners | result: success | agency_id: {get_winners_request.agency_id}')
         
-        # Check if lottery has been conducted
-        if not self.lottery_ready():
-            logging.info(f'action: lottery_status | result: not_conducted | agency_id: {get_winners_request.agency_id}')
+        # Barrier sync
+        logging.info(f'action: waiting_for_all_clients | result: in_progress | agency_id: {get_winners_request.agency_id}')
+        try:
+            self._lottery_barrier.wait()
+            logging.info('action: sorteo | result: success | all_clients_ready: true')
+        except threading.BrokenBarrierError:
+            logging.error('action: barrier_broken | result: fail')
             return p.NotConducted()
 
         winners = self.get_winners(agency_id=get_winners_request.agency_id)
@@ -194,15 +206,10 @@ class Server:
     def __handle_agency_ready(self, msg):
         try:
             agency_ready = p.AgencyReady.Deserialize(msg)
+            logging.info(f'action: agency_ready_received | result: success | agency_id: {agency_ready.agency_id}')
         except ValueError as e:
+            logging.error(f'action: agency_ready_parse | result: fail | error: {e}')
             return
-        # Set ready
-        try: 
-            with self._status_lock:
-                self.agency_status[agency_ready.agency_id] = True
-            logging.info(f'action: agency_status_update | result: success | agency_id: {agency_ready.agency_id}')
-        except Exception as e:
-            logging.error(f'action: agency_status_update | result: fail | error: {e}')
 
     def get_winners(self, agency_id):
         """
@@ -215,23 +222,6 @@ class Server:
                 if b.agency == agency_id and u.has_won(b):
                     winners.add_Id(b.document)
         return winners
-
-    def lottery_ready(self):
-        with self._status_lock:
-            if not self.lottery_conducted:
-                for _, ready in self.agency_status.items():
-                    if not ready:
-                        return False
-                logging.info('action: sorteo | result: success')
-                self.lottery_conducted = True
-
-            return True
-
-def generate_lottery_diccionary(client_number):
-    d = {}
-    for i in range(1, client_number + 1):
-        d[i] = False
-    return d
 
 # send and rcv wrappers for handling short-reads/writes
 def _full_recv(sock, size):

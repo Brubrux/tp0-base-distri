@@ -15,40 +15,34 @@ func (c *Client) SendBetsAwaitWinners(filePath string, agencyID uint8) {
 		return
 	}
 
-	hasWinners := false
-	var winners *protocol.Winners
-	for !c.hasSignal() && !hasWinners {
-		// sleep de 1 segundo para testear cierre gracefull
-		// time.Sleep(1 * time.Second)
-		log.Debugf("action: espera_ganadores | result: in_progress")
-		c.createClientSocket()
-		if err := c.sendGetWinners(agencyID); err != nil {
-			log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			c.conn.Close()
-			return
-		}
+	if err := c.sendGetWinners(agencyID); err != nil {
+		log.Errorf("action: send_get_winners | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		c.sendTerminate()
+		return
+	}
 
-		response, err := c.ReadWithPayloadLength()
-		c.conn.Close()
+	// Await winners response
+	log.Debugf("action: espera_ganadores | result: in_progress")
 
-		if err != nil {
-			log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
-		hasWinners, winners, err = protocol.DeserializeWinnersResponse(response)
-		if err != nil {
-			log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			return
-		}
+	response, err := c.ReadWithPayloadLength()
+	if err != nil {
+		log.Errorf("action: read_response | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+
+	hasWinners, winners, err := protocol.DeserializeWinnersResponse(response)
+	if err != nil {
+		log.Errorf("action: read_response | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
 	}
 
 	if hasWinners {
@@ -57,6 +51,10 @@ func (c *Client) SendBetsAwaitWinners(filePath string, agencyID uint8) {
 		)
 	} else {
 		log.Infof("action: consulta_ganadores | result: fail")
+	}
+
+	if c.conn != nil {
+		c.conn.Close()
 	}
 }
 

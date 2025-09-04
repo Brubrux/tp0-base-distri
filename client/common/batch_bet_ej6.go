@@ -8,7 +8,7 @@ import (
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 )
 
-func (c *Client) SendBetBatch(filePath string, agencyID uint8) {
+func (c *Client) SendBetBatch(filePath string, agencyID uint8) error {
 	c.createClientSocket()
 
 	file, err := os.Open(filePath)
@@ -17,7 +17,7 @@ func (c *Client) SendBetBatch(filePath string, agencyID uint8) {
 			c.config.ID,
 			err,
 		)
-		return
+		return err
 	}
 	defer file.Close()
 
@@ -35,30 +35,25 @@ func (c *Client) SendBetBatch(filePath string, agencyID uint8) {
 			log.Debugf("action: sending_batch | result: in_progress | batch: %d",
 				betBatch.GetBetCount(),
 			)
-
 			if err := c.sendBatch(betBatch); err != nil {
 				log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
 					c.config.ID,
 					err,
 				)
 				c.conn.Close()
-				return
-			} else {
-
+				return err
 			}
-
 			betBatch = protocol.NewBatch(agencyID, c.config.MaxBatchAmount)
 			betBatch.AddBetLine(bet_line)
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
-		return
+		return err
 	}
-
 	if c.hasSignal() {
 		c.sendTerminate()
-		return
+		return nil
 	}
 
 	// send last batch
@@ -68,9 +63,10 @@ func (c *Client) SendBetBatch(filePath string, agencyID uint8) {
 			err,
 		)
 		c.conn.Close()
-		return
+		return err
 	}
 	c.sendTerminate()
+	return nil
 }
 
 func (c *Client) sendBatch(batch *protocol.BetBatchRegister) error {

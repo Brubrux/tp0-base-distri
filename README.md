@@ -294,8 +294,13 @@ Luego de enviar todo el stream de apuestas y recibir sus respectivas confirmacio
 ## Ej 7
 
 ### Cliente
-Desde el lado del cliente no es necesario hacer muchos cambios respecto del ejercicio anterior, la primera parte de la logica es basicamente la misma.
+Desde el lado del cliente no es necesario hacer muchos cambios respecto del ejercicio anterior, la primera parte de la logica es basicamente la misma. Solo se agrego el mensaje Agency ready que indica que el cliente termino de mandar sus bets. Se diferencia del Terminate porque el ultimo es para indicar el cierre del de la conexion en cualquier contexto.
 Lo que es necesario ahora es, luego de enviar Terminate para avisar al servidor que se ha terminado de enviar apuestas, volver a conectarse para consultar por los ganadores OpCode (0x03). La respuesta esperada en este caso viene con un nuevo OpCode (0x04) que indica que el mensaje contiene la lista de numeros ganadores:
+
+#### AgencyReady
+```
+| 0x06 |  Payload Lenght 4B   | 1B Agency Id |
+```
 
 #### GetWinners
 ```

@@ -9,6 +9,7 @@ const (
 	GET_WINNERS   OpCode = 0x03
 	WINNERS       OpCode = 0x04
 	NOT_CONDUCTED OpCode = 0x05
+	READY         OpCode = 0x06
 
 	TERMINATE OpCode = 0xFF
 )

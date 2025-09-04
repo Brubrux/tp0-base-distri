@@ -65,6 +65,7 @@ func (c *Client) SendBetBatch(filePath string, agencyID uint8) error {
 		c.conn.Close()
 		return err
 	}
+	c.sendAgencyReady(agencyID)
 	c.sendTerminate()
 	return nil
 }
@@ -95,6 +96,13 @@ func (c *Client) sendBatch(batch *protocol.BetBatchRegister) error {
 		)
 	}
 	return nil
+}
+
+func (c *Client) sendAgencyReady(agencyID uint8) {
+	msg := []byte{byte(protocol.READY), 0x00, 0x00, 0x00, 0x00, agencyID}
+	c.FullWrite(msg)
+	log.Infof("action: send_agency_ready | result: success")
+	c.conn.Close()
 }
 
 func (c *Client) sendTerminate() {

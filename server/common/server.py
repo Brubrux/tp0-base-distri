@@ -11,6 +11,9 @@ class Server:
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self._active_connection = None
+        self.agency_status = {
+            1: False, 2: False, 3: False, 4: False, 5: False
+        }
 
     def run(self):
         """
@@ -50,6 +53,9 @@ class Server:
                 elif op_code == b'\x03':  # Get Winners
                     logging.info(f'action: receive_get_winners | result: success | ip: {addr[0]}')
                     response = self.__handle_get_winners(msg)
+                elif op_code == b'\x06':  # Agency Ready
+                    logging.info(f'action: receive_agency_ready | result: success | ip: {addr[0]}')
+                    response = self.__handle_agency_ready(msg)
                 elif op_code == b'\xFF':  # Terminate
                     logging.info(f'action: receive_terminate | result: success | ip: {addr[0]}')
                     break
@@ -131,7 +137,51 @@ class Server:
         return p.BetConfirmation(True, f"{len(bet_batch.bets)}")
 
     def __handle_get_winners(self, msg):
-        return bytes([0x05, 0x00, 0x00, 0x00, 0x00])
+        try:
+            get_winners_request = p.GetWinners.DeserializeGetWinners(msg)
+            logging.info(f'action: decode_get_winners | result: success | agency_id: {get_winners_request.agency_id}')
+        except ValueError as e:
+            logging.error(f'action: decode_get_winners | result: fail | error: {e}')
+            return p.BetConfirmation(False, "bad_request")
+        
+        # Check if lottery has been conducted
+        if not self.lottery_ready():
+            logging.info(f'action: lottery_status | result: not_conducted | agency_id: {get_winners_request.agency_id}')
+            return p.NotConducted()
+
+        winners = self.get_winners(agency_id=get_winners_request.agency_id)
+
+        logging.info(f'action: send_winners | result: success | agency_id: {get_winners_request.agency_id} | winners_count: {winners.get_count()}')
+        return winners
+
+    def __handle_agency_ready(self, msg):
+        try:
+            agency_ready = p.AgencyReady.Deserialize(msg)
+            logging.info(f'action: decode_agency_ready | result: success | agency_id: {agency_ready.agency_id}')
+        except ValueError as e:
+            logging.error(f'action: decode_agency_ready | result: fail | error: {e}')
+            return p.BetConfirmation(False, "bad_request")
+
+        # set ready
+        self.agency_status[agency_ready.agency_id] = True
+        logging.info(f'action: agency_status_update | result: success | agency_id: {agency_ready.agency_id}')
+        return p.BetConfirmation(True, "agency_ready")
+
+    def get_winners(self, agency_id):
+        """
+        Get winners for a specific agency
+        """
+        winners = p.Winners()
+        for b in u.load_bets():
+            if b.agency == agency_id and u.has_won(b):
+                winners.add_Id(b.document)
+        return winners
+
+    def lottery_ready(self):
+        for _, ready in self.agency_status.items():
+            if not ready:
+                return False
+        return True
 
 # send and rcv wrappers for handling short-reads/writes
 

@@ -10,6 +10,7 @@ class OpCodes(enum.IntEnum):
     GET_WINNERS = 0x03
     WINNERS = 0x04
     NOT_CONDUCTED = 0x05
+    READY = 0x06
     TERMINATE = 0xFF
 
 class BetRegister:
@@ -105,8 +106,7 @@ class BetBatchRegister:
         if op_code != OpCodes.BATCH:
             raise ValueError(f"Invalid OpCode: {op_code} should be {OpCodes.BATCH}")
         index += 1
-
-        # Skip payload length
+        # Skip payload
         index += 4
 
         # AgencyID
@@ -131,6 +131,97 @@ class BetBatchRegister:
         
         return BetBatchRegister(agency_id, bets, bets_count)
 
+class GetWinners:
+    def __init__(self, agency_id):
+        self.agency_id = agency_id
+
+    @staticmethod
+    def DeserializeGetWinners(msg):
+        index = 0
+        # OpCode
+        op_code = msg[index]
+        if op_code != OpCodes.GET_WINNERS:
+            raise ValueError(f"Invalid OpCode: {op_code} should be {OpCodes.GET_WINNERS}")
+        index += 1
+
+        # Skip payload length
+        index += 4
+
+        # AgencyID
+        agency_id = msg[index]
+        index += 1
+
+        return GetWinners(agency_id)
+
+
+class Winners:
+    def __init__(self):
+        self.winner_ids = []
+
+    def add_Id(self, id):
+        self.winner_ids.append(id)
+
+    def ToBytes(self):
+        """
+        Serialize Winners to bytes
+        """
+        # Calculate payload size: 4 bytes for count + 4 bytes per winner DNI
+        payload_size = 4 + (len(self.winner_ids) * 4)
+        
+        message = bytearray()
+        
+        # OpCode (1 byte)
+        message.append(OpCodes.WINNERS)
+        
+        # Payload Length
+        message.extend(payload_size.to_bytes(4, byteorder='big'))
+        
+        # Winners Count
+        message.extend(len(self.winner_ids).to_bytes(4, byteorder='big'))
+
+        # Winner DNIs
+        for dni in self.winner_ids:
+            message.extend(dni.to_bytes(4, byteorder='big'))
+
+        return bytes(message)
+
+
+class NotConducted:
+    def ToBytes(self):
+        """
+        Serialize NotConducted to bytes
+        """
+        message = bytearray()
+        
+        # OpCode (1 byte)
+        message.append(OpCodes.NOT_CONDUCTED)
+        message.extend([0x00, 0x00, 0x00, 0x00])
+        return bytes(message)
+
+
+class AgencyReady:
+    def __init__(self, agency_id):
+        self.agency_id = agency_id
+
+    @staticmethod
+    def Deserialize(msg):
+        """
+        Deserialize AgencyReady message
+        """
+        index = 0
+        # OpCode
+        op_code = msg[index]
+        if op_code != OpCodes.READY:
+            raise ValueError(f"Invalid OpCode: {op_code} should be {OpCodes.READY}")
+        index += 1
+        # skip payload
+        index += 4
+
+        # AgencyID
+        agency_id = msg[index]
+        index += 1
+
+        return AgencyReady(agency_id)
 
 def csv_to_bet(csv_string, agency_id):
     """

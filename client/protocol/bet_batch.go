@@ -31,7 +31,8 @@ func NewBatch(agencyID uint8, maxBetLines int) *BetBatchRegister {
 // AddBetLine adds a new bet line to the batch if it fits within the max packet size and the max bet lines limit.
 // Returns true if the bet line was added successfully, false otherwise.
 func (b *BetBatchRegister) AddBetLine(betLine string) bool {
-	if len(b.betLines)+1 >= b.maxBetLines {
+
+	if len(b.betLines) >= b.maxBetLines {
 		return false
 	}
 
@@ -65,4 +66,8 @@ func (b *BetBatchRegister) ToBytes() []byte {
 	}
 
 	return buf.Bytes()
+}
+
+func (b *BetBatchRegister) GetBetCount() int {
+	return len(b.betLines)
 }

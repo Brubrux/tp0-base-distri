@@ -1,9 +1,12 @@
 import enum
 
+from common import utils
+
 
 class OpCodes(enum.IntEnum):
     REGISTER = 0x00
     CONFIRM = 0x01
+    BATCH = 0X02
 
 
 class BetRegister:
@@ -83,3 +86,68 @@ class BetConfirmation:
         msg.append(len(message_bytes))
         msg.extend(message_bytes)
         return bytes(msg)
+    
+
+class BetBatchRegister:
+    def __init__(self, agency_id, bets, bets_count):
+        self.agency_id = agency_id
+        self.bets = bets
+        self.bets_count = bets_count
+
+    @staticmethod
+    def DeserializeBetBatch(msg):
+        index = 0
+        # OpCode
+        op_code = msg[index]
+        if op_code != OpCodes.BATCH:
+            raise ValueError(f"Invalid OpCode: {op_code} should be {OpCodes.BATCH}")
+        index += 1
+
+        # Skip payload length
+        index += 4
+
+        # AgencyID
+        agency_id = msg[index]
+        index += 1
+
+        # Bets count 4B
+        bets_count = parse_int4_big_endian(msg[index:index + 4])
+        index += 4
+
+        # Bets -> 1b string len, "name,lastname,..."
+        bets = []
+        for _ in range(bets_count):
+            bet_length = msg[index]
+            index += 1
+            bet_csv = msg[index:index + bet_length].decode('utf-8')
+            index += bet_length
+            bets.append(csv_to_bet(bet_csv, agency_id))
+
+        if bets_count != len(bets):
+            raise ValueError(f"Invalid bets count: read {len(bets)}, expected {bets_count}")
+        
+        return BetBatchRegister(agency_id, bets, bets_count)
+
+
+def csv_to_bet(csv_string, agency_id):
+    """
+    Converts a CSV string to a Bet object from module utils.
+    String format expected: "first_name,last_name,id,birth_date,number"
+    """
+    fields = csv_string.split(',')
+    if len(fields) != 5:
+        raise ValueError(f"Invalid CSV format: {csv_string}")
+   
+    return utils.Bet(
+        agency=agency_id,
+        first_name=fields[0],
+        last_name=fields[1],
+        document=fields[2],
+        birthdate=fields[3],
+        number=fields[4]
+    )
+
+def parse_int4_big_endian(data):
+    if len(data) != 4:
+        raise ValueError("Data must be exactly 4 bytes long")
+    return (data[0] << 24) + (data[1] << 16) + (data[2] << 8) + data[3]

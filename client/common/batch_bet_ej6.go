@@ -36,8 +36,12 @@ func (c *Client) SendBetBatch(filePath string, agencyID uint8) {
 
 	for scanner.Scan() && !hasSignal() {
 		bet_line := scanner.Text()
+		log.Debugf("action: read_bet_line | result: success | bet_line: %s", bet_line)
 		// If batch is full, send it
 		if !betBatch.AddBetLine(bet_line) {
+			log.Infof("action: sending_batch | result: in_progress | batch: %d",
+				betBatch.GetBetCount(),
+			)
 			c.sendBatch(betBatch)
 			betBatch = protocol.NewBatch(agencyID, c.config.MaxBatchAmount)
 			betBatch.AddBetLine(bet_line)
@@ -90,7 +94,8 @@ func (c *Client) sendBatch(batch *protocol.BetBatchRegister) {
 	}
 
 	if confirmation.Success {
-		log.Infof("action: apuesta_enviada | result: success") //TODO: actualizar check de respuestas
-
+		log.Infof("action: apuesta_enviada | result: success | apuestas_guardadas: %s",
+			confirmation.Message,
+		)
 	}
 }

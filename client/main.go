@@ -114,7 +114,7 @@ func main() {
 		ID:             v.GetString("id"),
 		LoopAmount:     v.GetInt("loop.amount"),
 		LoopPeriod:     v.GetDuration("loop.period"),
-		MaxBatchAmount: v.GetInt("maxAmount"),
+		MaxBatchAmount: v.GetInt("batch.maxAmount"),
 	}
 
 	agency_id, err := strconv.ParseUint(clientConfig.ID, 10, 8)

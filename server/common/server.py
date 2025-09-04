@@ -43,7 +43,7 @@ class Server:
             addr = client_sock.getpeername()
             logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
 
-            confirmation = self.__handle_bet_register(msg, addr[0])
+            confirmation = self.__handle_bet_batch(msg)
 
             logging.info(f'action: send_confirmation | result: in_progress | ip: {addr[0]}')
             
@@ -86,8 +86,7 @@ class Server:
         except Exception as e:
             logging.error(f'action: decode_bet_register | result: fail | error: {e}')
             return p.BetConfirmation(False, "bad_request")
-
-        logging.debug(f'action: process_bet_register | result: in_progress | bet: {br.agency_id, br.first_name, br.last_name, br.id, br.birth_date, br.number}')
+        
         b = u.Bet(
             agency=br.agency_id,
             birthdate=br.birth_date,
@@ -104,11 +103,22 @@ class Server:
         logging.info(f'action: apuesta_almacenada | result: success | dni: {br.id} | numero: {br.number}')
         return p.BetConfirmation(True, "")
     
+    def __handle_bet_batch(self, msg):
+        try:
+            bet_batch = p.BetBatchRegister.DeserializeBetBatch(msg)
+            logging.info(f'action: decode_bet_batch | result: success | bets_count: {len(bet_batch.bets)}')
+        except ValueError as e:
+            logging.error(f'action: decode_bet_batch | result: fail | error: {e}')
+            return p.BetConfirmation(False, "bad_request")
 
-def parse_int4_big_endian(data):
-    if len(data) != 4:
-        raise ValueError("Data must be exactly 4 bytes long")
-    return (data[0] << 24) + (data[1] << 16) + (data[2] << 8) + data[3]
+        try:
+            u.store_bets(bet_batch.bets)
+        except Exception as e:
+            logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bet_batch.bets)}')
+            return p.BetConfirmation(False, "internal_error")
+        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch.bets)}')
+        return p.BetConfirmation(True, f"{len(bet_batch.bets)}")
+
 
 
 # send and rcv wrappers for handling short-reads/writes
@@ -148,7 +158,7 @@ def _recv_message_with_payload_length(sock):
     
     # Payload Length
     payload_length_data = _full_recv(sock, 4) 
-    payload_length = parse_int4_big_endian(payload_length_data)
+    payload_length = p.parse_int4_big_endian(payload_length_data)
     
     # Read the exact payload
     payload_data = _full_recv(sock, payload_length)

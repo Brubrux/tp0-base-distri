@@ -45,11 +45,7 @@ class Server:
                     logging.info(f'action: receive_terminate | result: success | ip: {addr[0]}')
                     break
 
-                logging.info(f'action: receive_message | result: success | ip: {addr[0]}')
-
                 confirmation = self.__handle_bet_batch(msg)
-
-                logging.info(f'action: send_confirmation | result: in_progress | ip: {addr[0]}')
                 
                 _full_send(client_sock, confirmation.ToBytes())
 
@@ -63,7 +59,9 @@ class Server:
             logging.error(f'action: message_processing_error | result: fail | ip: {addr[0]} | error: {e}')
         finally:
             self._active_connection = None
-            client_sock.close()
+            try:
+                client_sock.close()
+            except: pass
 
     def __handle_bet_batch(self, msg):
         try:
@@ -78,6 +76,7 @@ class Server:
         except Exception as e:
             logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bet_batch.bets)}')
             return p.BetConfirmation(False, "internal_error")
+        
         logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch.bets)}')
         return p.BetConfirmation(True, f"{len(bet_batch.bets)}")
     

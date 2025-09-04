@@ -2,7 +2,9 @@ package common
 
 import (
 	"bufio"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 )
@@ -34,70 +36,84 @@ func (c *Client) SendBetBatch(filePath string, agencyID uint8) {
 
 	betBatch := protocol.NewBatch(agencyID, c.config.MaxBatchAmount)
 	for scanner.Scan() && !hasSignal() {
+		// sleep de 0.1 segundo para testear cierre gracefull
+		time.Sleep(5 * time.Millisecond)
+
 		bet_line := scanner.Text()
-		log.Debugf("action: read_bet_line | result: success | bet_line: %s", bet_line)
 		// If batch is full, send it
 		if !betBatch.AddBetLine(bet_line) {
 			log.Infof("action: sending_batch | result: in_progress | batch: %d",
 				betBatch.GetBetCount(),
 			)
-			c.sendBatch(betBatch)
+
+			if err := c.sendBatch(betBatch); err != nil {
+				log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
+					c.config.ID,
+					err,
+				)
+
+				file.Close()
+				c.conn.Close()
+				return
+			} else {
+
+			}
+
 			betBatch = protocol.NewBatch(agencyID, c.config.MaxBatchAmount)
 			betBatch.AddBetLine(bet_line)
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
+		file.Close()
+		return
 	}
+
 	if sigterm {
+		c.sendTerminate()
 		file.Close()
 		return
 	}
 	// Last batch
-	c.sendBatch(betBatch)
-	c.sendTerminate()
-
-	file.Close()
-}
-
-func (c *Client) sendBatch(batch *protocol.BetBatchRegister) {
-	data := batch.ToBytes()
-	// Send the data to the server
-	if err := FullWrite(c, data); err != nil {
+	if err := c.sendBatch(betBatch); err != nil {
 		log.Errorf("action: send_batch | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
 		)
+		file.Close()
 		c.conn.Close()
 		return
+	}
+	c.sendTerminate()
+	file.Close()
+}
+
+func (c *Client) sendBatch(batch *protocol.BetBatchRegister) error {
+	data := batch.ToBytes()
+	// Send the data to the server
+	if err := FullWrite(c, data); err != nil {
+		return fmt.Errorf("error while sending batch: %v", err)
 	}
 
 	// Await response
 	responseData, err := readWithPayloadLength(c.conn)
-
 	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
+		return fmt.Errorf("error while reading response: %v", err)
 	}
 
 	// Check confirmation
 	confirmation, err := protocol.DeserializeConfirmation(responseData)
 	if err != nil {
-		log.Errorf("action: deserialize_confirmation | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
+		return fmt.Errorf("error while deserializing confirmation: %v", err)
 	}
 
 	if confirmation.Success {
-		log.Infof("action: apuesta_enviada | result: success | apuestas_guardadas: %s",
+		log.Infof("action: send_batch | result: success | client_id: %v | confirmation: %v",
+			c.config.ID,
 			confirmation.Message,
 		)
 	}
+	return nil
 }
 
 func (c *Client) sendTerminate() {

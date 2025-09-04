@@ -4,7 +4,8 @@ NAME = "name: tp0"
 
 SERVICES = "services:"
 
-SERVER = """  server:
+def server_maker(client_num):
+    return f"""  server:
     container_name: server
     image: server:latest
     entrypoint: python3 /main.py
@@ -12,6 +13,7 @@ SERVER = """  server:
       - ./server/config.ini:/config.ini
     environment:
       - PYTHONUNBUFFERED=1
+      - CLIENT_NUM={client_num}
     networks:
       - testing_net
 """
@@ -44,7 +46,7 @@ def compose_maker(file_name, client_num):
     with open(file_name, "w") as f:
         f.write(NAME + '\n')
         f.write(SERVICES + '\n')
-        f.write(SERVER + '\n')
+        f.write(server_maker(client_num))
         for i in range(1, client_num+1):
             f.write(client_maker(i))
         f.write(NETWORKS)

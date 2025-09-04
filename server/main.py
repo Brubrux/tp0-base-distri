@@ -42,6 +42,8 @@ def main():
     port = config_params["port"]
     listen_backlog = config_params["listen_backlog"]
 
+    client_number = int(os.getenv('CLIENT_NUM', 0))
+
     initialize_log(logging_level)
 
     # Log config parameters at the beginning of the program to verify the configuration
@@ -52,8 +54,8 @@ def main():
 
     
     # Initialize server and start server loop
-    server = Server(port, listen_backlog)
-    
+    server = Server(port, listen_backlog, client_number)
+
     def handler(signum, frame):
         server.shutdown()
 

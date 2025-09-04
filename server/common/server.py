@@ -5,15 +5,14 @@ from common import utils as u
 
 
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, client_number):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
         self._active_connection = None
-        self.agency_status = {
-            1: False, 2: False, 3: False, 4: False, 5: False
-        }
+        self.agency_status = generate_lottery_diccionary(client_number)
+        self.lottery_conducted = False
 
     def run(self):
         """
@@ -172,12 +171,22 @@ class Server:
         return winners
 
     def lottery_ready(self):
-        for _, ready in self.agency_status.items():
-            if not ready:
-                return False
+        if not self.lottery_conducted:
+            for _, ready in self.agency_status.items():
+                if not ready:
+                    return False
+            logging.info('action: sorteo | result: success')
+            self.lottery_conducted = True
+
         return True
 
 # send and rcv wrappers for handling short-reads/writes
+
+def generate_lottery_diccionary(client_number):
+    d = {}
+    for i in range(1, client_number + 1):
+        d[i] = False
+    return d
 
 def _full_recv(sock, size):
     """

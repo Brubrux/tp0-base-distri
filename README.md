@@ -325,6 +325,9 @@ Es la respuesta del servidor cuando el sorteo todavia no se ha llevado a cabo. E
 ```
 Si ya se realizó el sorteo, el servidor responde con un mensaje de OpCode 0x04 que incluye la cantidad y lista de ganadores.
 
+### Servidor
+Al atender a los clientes de manera secuencial, el modelo cliente-servidor puede tratarse como un modelo de Actores donde el servidor puede decirle al cliente que se vuelva a conectar más tarde si no hay resultados disponibles. Esto es tambien necesario porque en esta estructura de servidor las conexiones no se mantienen. Por esto último tambien es que se tuvo que agregar un registro de cada uno de los clientes que indica si este ya esta listo o no para recibir la lista de ganadores.
+
 # Ej 8
 
 Se decidio utilizar la biblioteca threadings porque esta es simple de usar y no significaba mayores cambios por sobre la estructura ya existente del servidor.

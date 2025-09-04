@@ -129,5 +129,5 @@ func main() {
 
 	client := common.NewClient(clientConfig, sigterm_channel)
 
-	client.SendBetBatch(bet_file, uint8(agency_id))
+	client.SendBetsAwaitWinners(bet_file, uint8(agency_id))
 }

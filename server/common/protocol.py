@@ -7,6 +7,9 @@ class OpCodes(enum.IntEnum):
     REGISTER = 0x00
     CONFIRM = 0x01
     BATCH = 0X02
+    GET_WINNERS = 0x03
+    WINNERS = 0x04
+    NOT_CONDUCTED = 0x05
     TERMINATE = 0xFF
 
 class BetRegister:

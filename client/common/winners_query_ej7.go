@@ -1,6 +1,10 @@
 package common
 
-import "github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
+import (
+	"time"
+
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
+)
 
 func (c *Client) SendBetsAwaitWinners(filePath string, agencyID uint8) {
 	if err := c.SendBetBatch(filePath, agencyID); err != nil {
@@ -16,6 +20,8 @@ func (c *Client) SendBetsAwaitWinners(filePath string, agencyID uint8) {
 	hasWinners := false
 	var winners *protocol.Winners
 	for !c.hasSignal() && !hasWinners {
+		// sleep de 1 segundo para testear cierre gracefull
+		time.Sleep(1 * time.Second)
 		c.createClientSocket()
 		if err := c.sendGetWinners(agencyID); err != nil {
 			log.Errorf("action: send_bets | result: fail | client_id: %v | error: %v",

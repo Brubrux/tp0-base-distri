@@ -30,6 +30,7 @@ class Server:
                 logging.info(f'action: shutdown_close_socket | result: success')
                 break
 
+
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -40,14 +41,23 @@ class Server:
         try:
             addr = client_sock.getpeername()
             while True:
-                msg = _recv_message_with_payload_length(client_sock)
-                if msg is None:
+                op_code, msg = _recv_message_with_payload_length(client_sock)
+                
+                if op_code == b'\x02':  # Batch
+                    logging.info(f'action: receive_batch | result: success | ip: {addr[0]}')
+                    confirmation = self.__handle_bet_batch(msg)
+                    response = confirmation.ToBytes()
+                elif op_code == b'\x03':  # Get Winners
+                    logging.info(f'action: receive_get_winners | result: success | ip: {addr[0]}')
+                    response = self.__handle_get_winners(msg)
+                elif op_code == b'\xFF':  # Terminate
                     logging.info(f'action: receive_terminate | result: success | ip: {addr[0]}')
                     break
+                else:
+                    logging.warning(f'action: receive_unknown | result: fail | ip: {addr[0]} | error: unknown opcode')
+                    raise ValueError("Unknown OpCode")
 
-                confirmation = self.__handle_bet_batch(msg)
-                
-                _full_send(client_sock, confirmation.ToBytes())
+                _full_send(client_sock, response)
 
                 logging.info(f'action: send_confirmation | result: success | ip: {addr[0]}')
 
@@ -62,23 +72,6 @@ class Server:
             try:
                 client_sock.close()
             except: pass
-
-    def __handle_bet_batch(self, msg):
-        try:
-            bet_batch = p.BetBatchRegister.DeserializeBetBatch(msg)
-            logging.info(f'action: decode_bet_batch | result: success | bets_count: {len(bet_batch.bets)}')
-        except ValueError as e:
-            logging.error(f'action: decode_bet_batch | result: fail | error: {e}')
-            return p.BetConfirmation(False, "bad_request")
-
-        try:
-            u.store_bets(bet_batch.bets)
-        except Exception as e:
-            logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bet_batch.bets)}')
-            return p.BetConfirmation(False, "internal_error")
-        
-        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch.bets)}')
-        return p.BetConfirmation(True, f"{len(bet_batch.bets)}")
     
     def __accept_new_connection(self):
         """
@@ -120,6 +113,26 @@ class Server:
             logging.info(f'action: close_client_connection | result: success | closed_count: 1')
 
 
+    def __handle_bet_batch(self, msg):
+        try:
+            bet_batch = p.BetBatchRegister.DeserializeBetBatch(msg)
+            logging.info(f'action: decode_bet_batch | result: success | bets_count: {len(bet_batch.bets)}')
+        except ValueError as e:
+            logging.error(f'action: decode_bet_batch | result: fail | error: {e}')
+            return p.BetConfirmation(False, "bad_request")
+
+        try:
+            u.store_bets(bet_batch.bets)
+        except Exception as e:
+            logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bet_batch.bets)}')
+            return p.BetConfirmation(False, "internal_error")
+        
+        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch.bets)}')
+        return p.BetConfirmation(True, f"{len(bet_batch.bets)}")
+
+    def __handle_get_winners(self, msg):
+        return bytes([0x05, 0x00, 0x00, 0x00, 0x00])
+
 # send and rcv wrappers for handling short-reads/writes
 
 def _full_recv(sock, size):
@@ -156,14 +169,10 @@ def _recv_message_with_payload_length(sock):
 
     opcode_data = _full_recv(sock, 1)
 
-    if opcode_data == b'\xFF': # Terminate
-        logging.info(f'action: receive_terminate | result: in_progress')
-        return None
-
     # Payload Length
     payload_length_data = _full_recv(sock, 4) 
     payload_length = p.parse_int4_big_endian(payload_length_data)
     
     # Read the exact payload
     payload_data = _full_recv(sock, payload_length)
-    return opcode_data + payload_length_data + payload_data
+    return opcode_data, opcode_data + payload_length_data + payload_data

@@ -99,7 +99,9 @@ func (c *Client) sendBatch(batch *protocol.BetBatchRegister) error {
 }
 
 func (c *Client) sendAgencyReady(agencyID uint8) {
-	msg := []byte{byte(protocol.READY), 0x00, 0x00, 0x00, 0x00, agencyID}
+	// Format: | 0x06 | 00 00 00 01 | XX |
+	//         OpCode  Payload=1B    Agency ID
+	msg := []byte{byte(protocol.READY), 0x00, 0x00, 0x00, 0x01, agencyID}
 	c.FullWrite(msg)
 	log.Infof("action: send_agency_ready | result: success")
 	c.conn.Close()

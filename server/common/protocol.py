@@ -165,22 +165,17 @@ class Winners:
         """
         Serialize Winners to bytes
         """
-        # Calculate payload size: 4 bytes for count + 4 bytes per winner DNI
+        # 4 bytes for count + 4 bytes per winner DNI
         payload_size = 4 + (len(self.winner_ids) * 4)
-        
+
         message = bytearray()
-        
-        # OpCode (1 byte)
+
         message.append(OpCodes.WINNERS)
-        
-        # Payload Length
         message.extend(payload_size.to_bytes(4, byteorder='big'))
-        
-        # Winners Count
         message.extend(len(self.winner_ids).to_bytes(4, byteorder='big'))
 
-        # Winner DNIs
         for dni in self.winner_ids:
+            dni = int(dni)
             message.extend(dni.to_bytes(4, byteorder='big'))
 
         return bytes(message)
@@ -192,10 +187,10 @@ class NotConducted:
         Serialize NotConducted to bytes
         """
         message = bytearray()
-        
+
         # OpCode (1 byte)
         message.append(OpCodes.NOT_CONDUCTED)
-        message.extend([0x00, 0x00, 0x00, 0x00])
+        message.extend([0x00, 0x00, 0x00, 0x00]) # payload length
         return bytes(message)
 
 
@@ -219,7 +214,6 @@ class AgencyReady:
 
         # AgencyID
         agency_id = msg[index]
-        index += 1
 
         return AgencyReady(agency_id)
 

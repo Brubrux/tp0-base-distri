@@ -21,17 +21,19 @@ type ClientConfig struct {
 
 // Client Entity that encapsulates how
 type Client struct {
-	config      ClientConfig
-	conn        net.Conn
-	signal_chan chan os.Signal
+	config       ClientConfig
+	conn         net.Conn
+	signalChan   chan os.Signal
+	shuttingDown bool
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
 func NewClient(config ClientConfig, signal_chan chan os.Signal) *Client {
 	client := &Client{
-		config:      config,
-		signal_chan: signal_chan,
+		config:       config,
+		signalChan:   signal_chan,
+		shuttingDown: false,
 	}
 	return client
 }
@@ -50,4 +52,14 @@ func (c *Client) createClientSocket() error {
 	}
 	c.conn = conn
 	return nil
+}
+
+func (c *Client) hasSignal() bool {
+	select {
+	case <-c.signalChan:
+		c.shuttingDown = true
+		return true
+	default:
+		return c.shuttingDown
+	}
 }

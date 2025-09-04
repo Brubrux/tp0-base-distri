@@ -1,60 +1,11 @@
 package common
 
-import (
-	"net"
-
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
-)
+import "fmt"
 
 // ------- Ej5 --------
 
-// Sends a bet registration message to the server and awaits confirmation
-func (c *Client) SendBetRegister(b protocol.BetRegister) {
-
-	c.createClientSocket()
-
-	// Serialize and send
-	msg := b.ToBytes()
-	if err := FullWrite(c, msg); err != nil {
-		log.Errorf("action: send_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-
-	// Await response
-	responseData, err := readWithPayloadLength(c.conn)
-	c.conn.Close()
-
-	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-
-	// Check confirmation
-	confirmation, err := protocol.DeserializeConfirmation(responseData)
-	if err != nil {
-		log.Errorf("action: deserialize_confirmation | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		return
-	}
-
-	if confirmation.Success {
-		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
-			b.ID,
-			b.Number,
-		)
-	}
-}
-
 // Sends a message to the server making sure to write the full message
-func FullWrite(c *Client, msg []byte) error {
+func (c *Client) FullWrite(msg []byte) error {
 	for written := 0; written < len(msg); {
 		n, err := c.conn.Write(msg[written:])
 		if err != nil {
@@ -66,37 +17,58 @@ func FullWrite(c *Client, msg []byte) error {
 }
 
 // Reads exactly size bytes from the connection, handling short-reads
-func fullRead(conn net.Conn, size int) ([]byte, error) {
+func (c *Client) FullRead(size int) ([]byte, error) {
 	buffer := make([]byte, size)
 	totalRead := 0
 
 	for totalRead < size {
-		n, err := conn.Read(buffer[totalRead:])
-		if err != nil {
-			return nil, err
+		if c.hasSignal() {
+			return nil, fmt.Errorf("SIGTERM received")
 		}
-		totalRead += n
+
+		resultChan := make(chan int)
+		errorChan := make(chan error)
+
+		go func() {
+			n, err := c.conn.Read(buffer[totalRead:])
+			if err != nil {
+				errorChan <- err
+			} else {
+				resultChan <- n
+			}
+		}()
+
+		select {
+		case n := <-resultChan:
+			totalRead += n
+		case err := <-errorChan:
+			return nil, err
+		case <-c.signalChan:
+			c.shuttingDown = true
+			return nil, fmt.Errorf("SIGTERM received")
+		}
 	}
+
 	return buffer, nil
 }
 
 // Reads a complete message using the payload length field
-func readWithPayloadLength(conn net.Conn) ([]byte, error) {
+func (c *Client) ReadWithPayloadLength() ([]byte, error) {
 
 	// 1 byte
-	opCodeData, err := fullRead(conn, 1)
+	opCodeData, err := c.FullRead(1)
 	if err != nil {
 		return nil, err
 	}
 
 	// 4 bytes, big-endian
-	payloadLengthData, err := fullRead(conn, 4)
+	payloadLengthData, err := c.FullRead(4)
 	if err != nil {
 		return nil, err
 	}
 	payloadLength := parseUint32BigEndian(payloadLengthData)
 
-	payloadData, err := fullRead(conn, int(payloadLength))
+	payloadData, err := c.FullRead(int(payloadLength))
 	if err != nil {
 		return nil, err
 	}

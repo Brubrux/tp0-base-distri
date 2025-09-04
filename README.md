@@ -325,4 +325,40 @@ Es la respuesta del servidor cuando el sorteo todavia no se ha llevado a cabo. E
 ```
 Si ya se realizó el sorteo, el servidor responde con un mensaje de OpCode 0x04 que incluye la cantidad y lista de ganadores.
 
+# Ej 8
 
+Se decidio utilizar la biblioteca threadings porque esta es simple de usar y no significaba mayores cambios por sobre la estructura ya existente del servidor.
+Ademas, ofrece herramientas utiles para el control de concurrencia y la sincronizacion entre hilos, en particular:
+- `threadings.Event` para poder manejar una eventual SIGTERM en todos los threads.
+- `threadings.Lock` para asegurar el acceso exclusivo a recursos compartidos. En este caso la lista de conexiones activas y el acceso a escritura en archivos.
+- `threadings.Barrier` para asegurar que todos los clientes esten esperando al sorteo antes de liberar los ganadores.
+
+Ademas se cambio la logica de negocio entre los clientes y el servidor ya que si se mantenia como en su version secuencial, cuando un cliente terminaba de enviar sus apuestas, iba a entrar en un busy wait conectando, pidiendo los ganadores y recibiendo un `NotConducted`. Esto antes no ocurria porque, al atender a los clientes de a uno, si un servidor no estaba en condiciones de enviar `Winners` solo ignoraba al cliente y esperaba que, para cuando este vuelva a pedir, ya se hubieran atendido a los clientes restantes y el sorteo ya se hubiera realizado. Como ahora es concurrente y cada cliente puede ser atendido en paralelo, mantener esta logica de negocios significaba costos importantes de tiempo de espera y recursos.
+
+### Nueva logica de negocio
+
+#### Clientes
+1. El cliente se conecta al servidor y envia sus apuestas **BetBatchRegister**.
+2. El servidor procesa las apuestas de ese cliente en un thread propio y las va guardando y respondiendo a cada batch con un **BetConfirmation**.
+3. Una vez terminado de enviar todas las apuestas, el cliente envia un mensaje **AgencyReady** (OpCode 0x06), y luego un **GetWinners** (OpCode 0x03).
+4. Luego de mandar este mensaje se queda bloqueado en espera de la respuesta del servidor que viene en forma de un mensaje **Winners** (OpCode 0x04). En esta nueva logica de negocios queda deprecado el uso de **NotConducted** (OpCode 0x05) ya que el servidor, en vez de decirle al cliente que vuelva a preguntar mas tarde, hace que el cliente quede bloqueado esperando la respuesta y solo le responde con la lista de ganadores.
+5. Una vez recibido el mensaje **Winners** el cliente imprime la cantidad de ganadores y la conexion es cerrada por el servidor.
+
+#### Servidor
+1. El servidor recibe las apuestas de los clientes y las procesa en threads separados.
+2. Cuando un cliente envia un mensaje **GetWinners** (OpCode 0x03), el thread que lo atiende se va a quedar bloqueado en una barrier que sirve como `rendezvous point` hasta que todos los clientes hayan enviado sus apuestas y estén listos para recibir los resultados. Esto quita la necesidad de tener que mantener registros de cada uno de los clientes y sus estados, como funcionaba anteriormente.
+3. Una vez que todos los clientes llegaron a la barrera, se libera y cada thread es libre de leer los resultados. El uso de las funciones `load_bets()` y `u.has_won()` no se protege con un lock ya que estas son ambas operaciones de lectura y no suponen un riesgo de race_conditions. Al mismo tiempo que tenerlas en un lock podria significar que toda la segunda parte de las transacciones se haga de manera secuencial.
+
+#### Cierre Gracefull
+
+-  Se establece el `_shutdown_event` para señalar a todos los threads que deben terminar
+-  Se aborta la barrier para liberar cualquier thread que esté esperando en el rendezvous point
+-  Se cierra el socket servidor para detener nuevas conexiones
+-  Se cierran todas las conexiones activas
+
+- Manejo de threads:
+  - Cada thread cliente verifica `_shutdown_event.is_set()` en su loop principal para terminar ordenadamente.
+  - La lista de conexiones activas (`_active_connections`) se mantiene sincronizada.
+
+- Barrier:
+  - Si hay threads esperando en la barrier cuando llega SIGTERM, `_lottery_barrier.abort()` los libera con una `BrokenBarrierError`.

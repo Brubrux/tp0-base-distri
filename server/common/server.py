@@ -192,12 +192,9 @@ class Server:
         
         # Barrier sync
         logging.info(f'action: waiting_for_all_clients | result: in_progress | agency_id: {get_winners_request.agency_id}')
-        try:
-            self._lottery_barrier.wait()
-            logging.info('action: sorteo | result: success | all_clients_ready: true')
-        except threading.BrokenBarrierError:
-            logging.error('action: barrier_broken | result: fail')
-            return p.NotConducted()
+
+        self._lottery_barrier.wait()
+        logging.info('action: sorteo | result: success | all_clients_ready: true')
 
         winners = self.get_winners(agency_id=get_winners_request.agency_id)
         logging.info(f'action: send_winners | result: success | agency_id: {get_winners_request.agency_id} | winners_count: {len(winners.winner_ids)}')
@@ -214,13 +211,11 @@ class Server:
     def get_winners(self, agency_id):
         """
         Get winners for a specific agency
-        Thread-safe file access for reading bets
         """
         winners = p.Winners()
-        with self._file_lock:
-            for b in u.load_bets():
-                if b.agency == agency_id and u.has_won(b):
-                    winners.add_Id(b.document)
+        for b in u.load_bets():
+            if b.agency == agency_id and u.has_won(b):
+                winners.add_Id(b.document)
         return winners
 
 # send and rcv wrappers for handling short-reads/writes

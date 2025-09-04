@@ -24,19 +24,6 @@ services:
       - testing_net
     depends_on:
       - server
-  client2:
-    container_name: client2
-    image: client:latest
-    entrypoint: /client
-    volumes:
-      - ./client/config.yaml:/config.yaml
-      - ./.data/agency-2.csv:/agency-2.csv
-    environment:
-      - CLI_ID=2
-    networks:
-      - testing_net
-    depends_on:
-      - server
 networks:
   testing_net:
     ipam:

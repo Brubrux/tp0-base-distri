@@ -291,33 +291,3 @@ Luego de enviar todo el stream de apuestas y recibir sus respectivas confirmacio
 
 
 
-## Ej 7
-
-### Cliente
-Desde el lado del cliente no es necesario hacer muchos cambios respecto del ejercicio anterior, la primera parte de la logica es basicamente la misma.
-Lo que es necesario ahora es, luego de enviar Terminate para avisar al servidor que se ha terminado de enviar apuestas, volver a conectarse para consultar por los ganadores OpCode (0x03). La respuesta esperada en este caso viene con un nuevo OpCode (0x04) que indica que el mensaje contiene la lista de numeros ganadores:
-
-#### GetWinners
-```
-| 0x03 |  Payload Lenght 4B   | 1B Agency Id |
-```
-Mediante este mensaje la agencia se identifica y notifica al servidor que quiere consultar por los ganadores.
-La respuesta del servidor depende del estado. Si al recibirse esta solicitud, todavia no se llevo a cabo el sorteo, el servidor responde con un mensaje de OpCode 0x05 que indica que el sorteo todavia no se ha realizado y que vuelva a consultar.
-
-#### NotConducted
-```
-| 0x05 |  Payload Lenght 4B   |
-```
-Es la respuesta del servidor cuando el sorteo todavia no se ha llevado a cabo. En este caso el cliente debe volver a consultar mas tarde.
-
-#### Winners
-```
-| 0x04 |  Payload Lenght 4B   |
-|     4B Winners Count        |
-|      4B Winner1 DNI         |
-|            ...              |
-|      4B WinnerN DNI         |
-```
-Si ya se realizó el sorteo, el servidor responde con un mensaje de OpCode 0x04 que incluye la cantidad y lista de ganadores.
-
-

@@ -1,5 +1,6 @@
 import socket
 import logging
+import threading
 from common import protocol as p
 from common import utils as u
 
@@ -10,26 +11,44 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self._active_connection = None
+
+        self._active_connections = []
+        self._connections_lock = threading.Lock()
+        
         self.agency_status = generate_lottery_diccionary(client_number)
         self.lottery_conducted = False
+        self._status_lock = threading.Lock()  # Lock for agency_status and lottery_conducted
+
+        self._file_lock = threading.Lock()    # Lock for utils functions
+
+        self._shutdown_event = threading.Event()
 
     def run(self):
         """
-        Dummy Server loop
+        Server loop
 
-        Server that accept a new connections and establishes a
-        communication with a client. After client with communucation
-        finishes, servers starts to accept new connections again
+        Server that accepts new connections and creates a new thread
+        for each client connection. Multiple clients can be handled
+        simultaneously.
         """
-        while True:
+        while not self._shutdown_event.is_set():
             try:
                 client_sock = self.__accept_new_connection()
-                self._active_connection = client_sock
                 
-                self.__handle_client_connection(client_sock)
+                with self._connections_lock:
+                    self._active_connections.append(client_sock)
+                client_thread = threading.Thread(
+                    target=self.__handle_client_connection,
+                    args=(client_sock,),
+                    daemon=True
+                )
+                client_thread.start()
+                
             except OSError as e:
-                logging.info(f'action: shutdown_close_socket | result: success')
+                if not self._shutdown_event.is_set():
+                    logging.error(f'action: accept_connection_error | result: fail | error: {e}')
+                else:
+                    logging.info(f'action: shutdown_close_socket | result: success')
                 break
 
 
@@ -38,45 +57,64 @@ class Server:
         Read message from a specific client socket and closes the socket
 
         If a problem arises in the communication with the client, the
-        client socket will also be closed
+        client socket will also be closed. This method is thread-safe
+        and can handle multiple clients concurrently.
         """
+        addr = None
         try:
             addr = client_sock.getpeername()
-            while True:
+            logging.info(f'action: start_client_handler | result: success | ip: {addr[0]} | thread: {threading.current_thread().name}')
+            
+            while not self._shutdown_event.is_set():
                 op_code, msg = _recv_message_with_payload_length(client_sock)
                 
                 if op_code == b'\x02':  # Batch
                     logging.info(f'action: receive_batch | result: success | ip: {addr[0]}')
                     confirmation = self.__handle_bet_batch(msg)
                     response = confirmation.ToBytes()
+
                 elif op_code == b'\x03':  # Get Winners
                     logging.info(f'action: receive_get_winners | result: success | ip: {addr[0]}')
                     response = self.__handle_get_winners(msg).ToBytes()
+
                 elif op_code == b'\x06':  # Agency Ready
                     logging.info(f'action: receive_agency_ready | result: success | ip: {addr[0]}')
                     self.__handle_agency_ready(msg)
+                    continue
+
                 elif op_code == b'\xFF':  # Terminate
                     logging.info(f'action: receive_terminate | result: success | ip: {addr[0]}')
                     break
                 else:
-                    logging.warning(f'action: receive_unknown | result: fail | ip: {addr[0]} | error: unknown opcode')
+                    logging.error(f'action: receive_unknown | result: fail | ip: {addr[0]} | error: unknown opcode')
                     raise ValueError("Unknown OpCode")
 
                 _full_send(client_sock, response)
-
                 logging.info(f'action: send_confirmation | result: success | ip: {addr[0]}')
 
         except ConnectionError as e:
-            logging.info(f'action: client_disconnected | result: success | ip: {addr[0]}')
+            if addr:
+                logging.info(f'action: client_disconnected | result: success | ip: {addr[0]}')
         except OSError as e:
-            logging.error(f'action: socket_error | result: fail | ip: {addr[0]} | error: {e}')
+            if addr:
+                logging.error(f'action: socket_error | result: fail | ip: {addr[0]} | error: {e}')
         except Exception as e:
-            logging.error(f'action: message_processing_error | result: fail | ip: {addr[0]} | error: {e}')
+            if addr:
+                logging.error(f'action: message_processing_error | result: fail | ip: {addr[0]} | error: {e}')
         finally:
-            self._active_connection = None
+            # Remove connection from active connections list
+            with self._connections_lock:
+                try:
+                    self._active_connections.remove(client_sock)
+                except ValueError:
+                    pass  # already removed
+            
             try:
                 client_sock.close()
-            except: pass
+                if addr:
+                    logging.info(f'action: close_client_connection | result: success | ip: {addr[0]}')
+            except:
+                pass
     
     def __accept_new_connection(self):
         """
@@ -93,41 +131,46 @@ class Server:
     def shutdown(self):
         """
         Shutdown the server gracefully:
-        1. Close listening socket
-        2. Close active connection, if there is one
+        1. Set shutdown event
+        2. Close listening socket
+        3. Close all active connections
         """
         logging.info(f'action: received_SIGTERM | result: in_progress')
         
-        # listening socket
+        self._shutdown_event.set()
+        
+        # Close listening socket
         try:
             self._server_socket.close()
             logging.info(f'action: close_listening_socket | result: success')
         except Exception as e:
             logging.error(f'action: close_listening_socket | result: fail | error: {e}')
 
-        # client connection
-        if self._active_connection is not None:
-            logging.info(f'action: closing_active_connections | count: 1')
-            try:
-                self._active_connection.close()
-                logging.debug(f'action: close_client_connection | result: success')
-            except Exception as e:
-                logging.warning(f'action: close_client_connection | result: fail | error: {e}')
-
-            self._active_connection = None
-            logging.info(f'action: close_client_connection | result: success | closed_count: 1')
+        # Close all connections
+        with self._connections_lock:
+            connections_count = len(self._active_connections)
+            if connections_count > 0:
+                logging.info(f'action: closing_active_connections | count: {connections_count}')
+                for client_sock in self._active_connections[:]:
+                    try:
+                        client_sock.close()
+                        logging.debug(f'action: close_client_connection | result: success')
+                    except Exception as e:
+                        logging.warning(f'action: close_client_connection | result: fail | error: {e}')
+                
+                self._active_connections.clear()
+                logging.info(f'action: close_client_connections | result: success | closed_count: {connections_count}')
 
 
     def __handle_bet_batch(self, msg):
         try:
             bet_batch = p.BetBatchRegister.DeserializeBetBatch(msg)
-            logging.info(f'action: decode_bet_batch | result: success | bets_count: {len(bet_batch.bets)}')
         except ValueError as e:
-            logging.error(f'action: decode_bet_batch | result: fail | error: {e}')
             return p.BetConfirmation(False, "bad_request")
 
         try:
-            u.store_bets(bet_batch.bets)
+            with self._file_lock:
+                u.store_bets(bet_batch.bets)
         except Exception as e:
             logging.error(f'action: apuesta_recibida | result: fail | cantidad: {len(bet_batch.bets)}')
             return p.BetConfirmation(False, "internal_error")
@@ -153,9 +196,10 @@ class Server:
             agency_ready = p.AgencyReady.Deserialize(msg)
         except ValueError as e:
             return
-        # set ready
+        # Set ready
         try: 
-            self.agency_status[agency_ready.agency_id] = True
+            with self._status_lock:
+                self.agency_status[agency_ready.agency_id] = True
             logging.info(f'action: agency_status_update | result: success | agency_id: {agency_ready.agency_id}')
         except Exception as e:
             logging.error(f'action: agency_status_update | result: fail | error: {e}')
@@ -163,24 +207,25 @@ class Server:
     def get_winners(self, agency_id):
         """
         Get winners for a specific agency
+        Thread-safe file access for reading bets
         """
         winners = p.Winners()
-        for b in u.load_bets():
-            if b.agency == agency_id and u.has_won(b):
-                winners.add_Id(b.document)
+        with self._file_lock:
+            for b in u.load_bets():
+                if b.agency == agency_id and u.has_won(b):
+                    winners.add_Id(b.document)
         return winners
 
     def lottery_ready(self):
-        if not self.lottery_conducted:
-            for _, ready in self.agency_status.items():
-                if not ready:
-                    return False
-            logging.info('action: sorteo | result: success')
-            self.lottery_conducted = True
+        with self._status_lock:
+            if not self.lottery_conducted:
+                for _, ready in self.agency_status.items():
+                    if not ready:
+                        return False
+                logging.info('action: sorteo | result: success')
+                self.lottery_conducted = True
 
-        return True
-
-# send and rcv wrappers for handling short-reads/writes
+            return True
 
 def generate_lottery_diccionary(client_number):
     d = {}
@@ -188,6 +233,7 @@ def generate_lottery_diccionary(client_number):
         d[i] = False
     return d
 
+# send and rcv wrappers for handling short-reads/writes
 def _full_recv(sock, size):
     """
     Receive exactly 'size' bytes, handling short-reads and connection closures

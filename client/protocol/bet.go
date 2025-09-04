@@ -6,6 +6,8 @@ const (
 	REGISTER OpCode = 0x00
 	CONFIRM  OpCode = 0x01
 	BATCH    OpCode = 0x02
+
+	TERMINATE OpCode = 0xFF
 )
 
 type BetRegister struct {

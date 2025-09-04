@@ -274,3 +274,13 @@ Para la confirmacion del chunk de apuestas se reutilizara el mensaje **BetConfir
 - 0x00: Registro de apuesta
 - 0x01: Confirmacion de apuesta
 - 0x02: Registro de multiples apuestas (batch)
+- 0xFF: Cierre de conexion
+
+### Protocolo
+
+
+#### End
+Luego de enviar todo el stream de apuestas y recibir sus respectivas confirmaciones, el cliente enviara un mensaje de cierre de conexion (OpCode 0xFF) para finalizar la comunicacion de manera ordenada. Este mensaje no contiene payload:
+| OpCode | Payload Lenght |
+|   -    |       -        |
+|   FF   |  00 00 00 00   |

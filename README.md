@@ -178,3 +178,190 @@ Se espera que se redacte una sección del README en donde se indique cómo ejecu
 Se proveen [pruebas automáticas](https://github.com/7574-sistemas-distribuidos/tp0-tests) de caja negra. Se exige que la resolución de los ejercicios pase tales pruebas, o en su defecto que las discrepancias sean justificadas y discutidas con los docentes antes del día de la entrega. El incumplimiento de las pruebas es condición de desaprobación, pero su cumplimiento no es suficiente para la aprobación. Respetar las entradas de log planteadas en los ejercicios, pues son las que se chequean en cada uno de los tests.
 
 La corrección personal tendrá en cuenta la calidad del código entregado y casos de error posibles, se manifiesten o no durante la ejecución del trabajo práctico. Se pide a los alumnos leer atentamente y **tener en cuenta** los criterios de corrección informados  [en el campus](https://campusgrado.fi.uba.ar/mod/page/view.php?id=73393).
+
+
+# Resolución 
+
+## Ej 1
+Se agregó el archivo `generar-compose.sh` que llama a un generador hecho en python. En este es donde se encuentra la lógica de crear y escribir el archivo pasado por parámetro.
+
+## Ej 2
+Se modificó el archivo `generador.py` creado en el ejercicio anterior para agregar al docker-compose un volumen en el servidor y otro en el cliente. De manera que los cambios efectuados en los archivos `config.ini` y `config.yaml` se persistan. Además fue necesario modificar las rutas en el cliente y el servidor para que lean desde el volumen creado y no desde la copia del archivo.
+Se agregaron archivos .dockerignore que hacen que se evite copiar los archivos y asegurar que funciona mediante el volumen.
+
+## Ej 3
+Se agrego el archivo `validar-echo-server.py` que levanta un contenedor **busybox**, se conecta al servidor y manda un mensaje arbitrario. Luego chequea que la respuesta del servidor sea la misma que el mensaje enviado. Si no se puede conectar o el mensaje es diferente el enviado, entonces enviara un error. A diferencia del ejercicio 1, aca se realizo la totalidad dle ejercicio en el mismo archivo .sh
+
+## Ej 4
+### Cliente
+Para el cierre gracefull del cliente se agregó un channel y se utilizó la función Notify del paquete signal de go. Una vez establecida la conexión, en cada iteración del loop, se chequea que este canal no haya recibido una señal SIGTERM. En caso de recibir una señal, se corta el ciclo antes de establecer la proxima conexión.
+
+### Servidor
+En un principio se registra en `main` un **signal handler**. Que utiliza el método `shutdown()` agregado a la clase `Server` para indicarle que debe apagarse.
+Para cortar el ciclo while del servidor se envolvió la lógica de negocio con el cliente dentro de un try..except. En caso de que se reciba una SIGTERM, el método `shutdown()` va a cerrar el socket, lo que va a generar que el `.accept()` se despierte y lanze una excepción. Esta excepcion va a ser captada por el wrapper antes mencionado y este va a salir del ciclo con un break.
+
+## Ej 5
+
+### Serializacion de los datos
+El mensaje que se envia tiene el siguiente formato:
+```
+| OpCode | Payload Lenght | Payload |
+```
+Donde:
+- OpCode: 1B
+- Payload Length: 4B
+- Payload: Variable
+
+Dentro del payload se encuentra la información específica de cada operación. Y se anuncia su largo para facilitar la deserialización y evitar errores del tipo "short-read" o "short-write".
+
+#### OpCodes
+- 0x00: Registro de apuesta
+- 0x01: Confirmacion de apuesta
+
+#### BetRegister
+Para cada campo necesario en el registro, se agrega un campo de 1 byte que indica la longitud del valor.
+```
+| 0x00 | Payload Lenght 4B  |
+| 1B Agency Id              |
+| 1B FirstName lenght| data |
+| 1B LastName lenght | data |
+| 1B ID lenght       | data |
+| 1B BirthDate lenght| data |
+| 1B Number lenght   | data |
+```
+
+#### BetConfirmation
+El byte del OpCode seguido de un byte que indica el exito (1) o fracaso (0) de la operación.
+Se agrega además soporte para un mensaje en caso de ser necesario. 
+```
+| 0x01 | Payload Lenght 4B |
+|     1B Success(bool)     |
+| 1B MsgLen |   Msg data   |
+```
+
+Un mensaje de confirmación sin contenido tendrá el siguiente formato:
+| OpCode | Payload Lenght | Success | MsgLen |
+|   -    |       -        |   -     |   -    |
+|  0x01  |      4B        |  0x01   |  0x00  |
+
+### Logica de negocio
+La comunicacion en este caso es bastante simple.
+Al iniciar la transaccion, el cliente enviara un mensaje **BetRegister** creado a partir de las variables de entorno y su ID.
+Luego de enviar este mensaje, se queda a la espera de una respuesta del servidor. Esta respuesta viene en forma de un mensaje **BetConfirmation**. 
+La logica de serializacion y deserializacion de cada entidad se encuentra en el package `protocol` del cliente y en el modulo `protocol.py` del servidor.
+
+Este protocolo fue pensado para poder ser escalable en los proximos ejercicios. Ya que cuenta con un amplio rango para definir operaciones.
+
+## Ej 6
+
+### Cliente
+Para la parte del cliente se agrega un nuevo OpCode (0x03) que indica que el mensaje contiene multiples apuestas. 
+Se agrega ademas el mensaje de tipo **BatchBetRegister** que, ademas de los headers, contendra la informacion de la agencia, la cantidad de apuestas del batch y finalmente el largo de cada apuesta junto a su contenido.
+
+```
+| 0x02 |  Payload Lenght 4B   |
+| 1B Agency Id | Bet count 4B |
+|  1B Bet #1 lenght  |  data  |
+|        ...         |  ...   |
+|  1B Bet #N lenght  |  data  |
+```
+En este caso se decidio no encodear los datos de cada apuesta sino mandar la cadena entera, actualizando el protocolo para que el servidor pueda procesar apuestas de longitud variable sin necesidad de conocer su estructura interna. Solo sabe que es una string de tipo csv y que cumple el siguiente formato:
+`"nombre,apellido,documento,fecha_nacimiento,numero"`
+
+
+### Servidor
+Se modifico el servidor para mantener una conexion de mayor duracion con el cliente, permitiendo recibir multiples BetBatch y enviar la confirmacion de los mismos. 
+Para la confirmacion se reutilizara el mensaje **BetConfirmation**, aprovechando el formato de este mensaje que incluye,ademas de indicar el exito o falla de la operacion, la posibilidad de agregar un mensaje con mayores detalles. En este caso se enviara la confirmacion o no del batch de apuestas junto con la cantidad de apuestas ingresadas.
+
+
+#### OpCodes
+- 0x00: Registro de apuesta
+- 0x01: Confirmacion de apuesta
+- 0x02: Registro de multiples apuestas (batch)
+- 0xFF: Cierre de conexion
+
+### Protocolo
+
+
+#### Terminate
+Luego de enviar todo el stream de apuestas y recibir sus respectivas confirmaciones, el cliente enviara un mensaje de cierre de conexion (OpCode 0xFF) para finalizar la comunicacion de manera ordenada. Este mensaje no contiene payload:
+| OpCode | Payload Lenght |
+|   -    |       -        |
+|   FF   |  00 00 00 00   |
+
+
+
+## Ej 7
+
+### Cliente
+Desde el lado del cliente no es necesario hacer muchos cambios respecto del ejercicio anterior, la primera parte de la logica es basicamente la misma. Solo se agrego el mensaje Agency ready que indica que el cliente termino de mandar sus bets. Se diferencia del Terminate porque el ultimo es para indicar el cierre del de la conexion en cualquier contexto.
+Lo que es necesario ahora es, luego de enviar Terminate para avisar al servidor que se ha terminado de enviar apuestas, volver a conectarse para consultar por los ganadores OpCode (0x03). La respuesta esperada en este caso viene con un nuevo OpCode (0x04) que indica que el mensaje contiene la lista de numeros ganadores:
+
+#### AgencyReady
+```
+| 0x06 |  Payload Lenght 4B   | 1B Agency Id |
+```
+
+#### GetWinners
+```
+| 0x03 |  Payload Lenght 4B   | 1B Agency Id |
+```
+Mediante este mensaje la agencia se identifica y notifica al servidor que quiere consultar por los ganadores.
+La respuesta del servidor depende del estado. Si al recibirse esta solicitud, todavia no se llevo a cabo el sorteo, el servidor responde con un mensaje de OpCode 0x05 que indica que el sorteo todavia no se ha realizado y que vuelva a consultar.
+
+#### NotConducted
+```
+| 0x05 |  Payload Lenght 4B   |
+```
+Es la respuesta del servidor cuando el sorteo todavia no se ha llevado a cabo. En este caso el cliente debe volver a consultar mas tarde.
+
+#### Winners
+```
+| 0x04 |  Payload Lenght 4B   |
+|     4B Winners Count        |
+|      4B Winner1 DNI         |
+|            ...              |
+|      4B WinnerN DNI         |
+```
+Si ya se realizó el sorteo, el servidor responde con un mensaje de OpCode 0x04 que incluye la cantidad y lista de ganadores.
+
+### Servidor
+Al atender a los clientes de manera secuencial, el modelo cliente-servidor puede tratarse como un modelo de Actores donde el servidor puede decirle al cliente que se vuelva a conectar más tarde si no hay resultados disponibles. Esto es tambien necesario porque en esta estructura de servidor las conexiones no se mantienen. Por esto último tambien es que se tuvo que agregar un registro de cada uno de los clientes que indica si este ya esta listo o no para recibir la lista de ganadores.
+
+# Ej 8
+
+Se decidio utilizar la biblioteca threadings porque esta es simple de usar y no significaba mayores cambios por sobre la estructura ya existente del servidor.
+Ademas, ofrece herramientas utiles para el control de concurrencia y la sincronizacion entre hilos, en particular:
+- `threadings.Event` para poder manejar una eventual SIGTERM en todos los threads.
+- `threadings.Lock` para asegurar el acceso exclusivo a recursos compartidos. En este caso la lista de conexiones activas y el acceso a escritura en archivos.
+- `threadings.Barrier` para asegurar que todos los clientes esten esperando al sorteo antes de liberar los ganadores.
+
+Ademas se cambio la logica de negocio entre los clientes y el servidor ya que si se mantenia como en su version secuencial, cuando un cliente terminaba de enviar sus apuestas, iba a entrar en un busy wait conectando, pidiendo los ganadores y recibiendo un `NotConducted`. Esto antes no ocurria porque, al atender a los clientes de a uno, si un servidor no estaba en condiciones de enviar `Winners` solo ignoraba al cliente y esperaba que, para cuando este vuelva a pedir, ya se hubieran atendido a los clientes restantes y el sorteo ya se hubiera realizado. Como ahora es concurrente y cada cliente puede ser atendido en paralelo, mantener esta logica de negocios significaba costos importantes de tiempo de espera y recursos.
+
+### Nueva logica de negocio
+
+#### Clientes
+1. El cliente se conecta al servidor y envia sus apuestas **BetBatchRegister**.
+2. El servidor procesa las apuestas de ese cliente en un thread propio y las va guardando y respondiendo a cada batch con un **BetConfirmation**.
+3. Una vez terminado de enviar todas las apuestas, el cliente envia un mensaje **AgencyReady** (OpCode 0x06), y luego un **GetWinners** (OpCode 0x03).
+4. Luego de mandar este mensaje se queda bloqueado en espera de la respuesta del servidor que viene en forma de un mensaje **Winners** (OpCode 0x04). En esta nueva logica de negocios queda deprecado el uso de **NotConducted** (OpCode 0x05) ya que el servidor, en vez de decirle al cliente que vuelva a preguntar mas tarde, hace que el cliente quede bloqueado esperando la respuesta y solo le responde con la lista de ganadores.
+5. Una vez recibido el mensaje **Winners** el cliente imprime la cantidad de ganadores y la conexion es cerrada por el servidor.
+
+#### Servidor
+1. El servidor recibe las apuestas de los clientes y las procesa en threads separados.
+2. Cuando un cliente envia un mensaje **GetWinners** (OpCode 0x03), el thread que lo atiende se va a quedar bloqueado en una barrier que sirve como `rendezvous point` hasta que todos los clientes hayan enviado sus apuestas y estén listos para recibir los resultados. Esto quita la necesidad de tener que mantener registros de cada uno de los clientes y sus estados, como funcionaba anteriormente.
+3. Una vez que todos los clientes llegaron a la barrera, se libera y cada thread es libre de leer los resultados. El uso de las funciones `load_bets()` y `u.has_won()` no se protege con un lock ya que estas son ambas operaciones de lectura y no suponen un riesgo de race_conditions. Al mismo tiempo que tenerlas en un lock podria significar que toda la segunda parte de las transacciones se haga de manera secuencial.
+
+#### Cierre Gracefull
+
+-  Se establece el `_shutdown_event` para señalar a todos los threads que deben terminar
+-  Se aborta la barrier para liberar cualquier thread que esté esperando en el rendezvous point
+-  Se cierra el socket servidor para detener nuevas conexiones
+-  Se cierran todas las conexiones activas
+
+- Manejo de threads:
+  - Cada thread cliente verifica `_shutdown_event.is_set()` en su loop principal para terminar ordenadamente.
+  - La lista de conexiones activas (`_active_connections`) se mantiene sincronizada.
+
+- Barrier:
+  - Si hay threads esperando en la barrier cuando llega SIGTERM, `_lottery_barrier.abort()` los libera con una `BrokenBarrierError`.

@@ -265,9 +265,13 @@ Se agrega ademas el mensaje de tipo **BatchBetRegister** que, ademas de los head
 |        ...         |  ...   |
 |  1B Bet #N lenght  |  data  |
 ```
+En este caso se decidio no encodear los datos de cada apuesta sino mandar la cadena entera, actualizando el protocolo para que el servidor pueda procesar apuestas de longitud variable sin necesidad de conocer su estructura interna. Solo sabe que es una string de tipo csv y que cumple el siguiente formato:
+`"nombre,apellido,documento,fecha_nacimiento,numero"`
+
 
 ### Servidor
-Para la confirmacion del chunk de apuestas se reutilizara el mensaje **BetConfirmation**, aprovechando el formato de este mensaje que incluye,ademas de indicar el exito o falla de la operacion, la posibilidad de agregar un mensaje con mayores detalles.
+Se modifico el servidor para mantener una conexion de mayor duracion con el cliente, permitiendo recibir multiples BetBatch y enviar la confirmacion de los mismos. 
+Para la confirmacion se reutilizara el mensaje **BetConfirmation**, aprovechando el formato de este mensaje que incluye,ademas de indicar el exito o falla de la operacion, la posibilidad de agregar un mensaje con mayores detalles. En este caso se enviara la confirmacion o no del batch de apuestas junto con la cantidad de apuestas ingresadas.
 
 
 #### OpCodes
@@ -279,8 +283,9 @@ Para la confirmacion del chunk de apuestas se reutilizara el mensaje **BetConfir
 ### Protocolo
 
 
-#### End
+#### Terminate
 Luego de enviar todo el stream de apuestas y recibir sus respectivas confirmaciones, el cliente enviara un mensaje de cierre de conexion (OpCode 0xFF) para finalizar la comunicacion de manera ordenada. Este mensaje no contiene payload:
 | OpCode | Payload Lenght |
 |   -    |       -        |
 |   FF   |  00 00 00 00   |
+
